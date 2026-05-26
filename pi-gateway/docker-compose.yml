@@ -1,0 +1,24 @@
+services:
+  pi-gateway:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - PI_CWD_ROOT=/workspace
+      - MAX_SESSIONS=50
+      - IDLE_TIMEOUT_MINUTES=30
+    volumes:
+      - ./workspace:/workspace
+      - ./sessions:/var/pi-sessions
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: "4"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
