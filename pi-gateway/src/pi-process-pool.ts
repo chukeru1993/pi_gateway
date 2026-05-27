@@ -6,7 +6,8 @@ import { collectEvent, type RecentEvent } from "./metrics.js";
 const MAX_TOTAL_PROCESSES = parseInt(process.env.MAX_SESSIONS || "50", 10);
 const MAX_MEMORY_PER_PROCESS = 2 * 1024 * 1024 * 1024; // 2GB
 const IDLE_TIMEOUT_MS = parseInt(process.env.IDLE_TIMEOUT_MINUTES || "30", 10) * 60_000;
-const SYSTEM_MEMORY_RATIO = 0.8;
+const SYSTEM_MEMORY_RATIO = parseFloat(process.env.SYSTEM_MEMORY_EVICTION_THRESHOLD || "0.98");
+const SYSTEM_MEMORY_EVICTION_DISABLED = process.env.DISABLE_SYSTEM_MEMORY_EVICTION === "true";
 
 export interface CreateOptions {
   provider?: string;
@@ -79,6 +80,7 @@ export class PiProcessPool {
   }
 
   startSystemMemoryMonitor() {
+    if (SYSTEM_MEMORY_EVICTION_DISABLED) return;
     setInterval(() => {
       const totalMem = os.totalmem();
       const usedMem = totalMem - os.freemem();

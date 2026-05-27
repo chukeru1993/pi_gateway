@@ -234,7 +234,7 @@ export function getDashboardHTML(): string {
     }
 
     refresh();
-    setInterval(refresh, 3000);
+    setInterval(refresh, 20000);
   </script>
 </body>
 </html>`;

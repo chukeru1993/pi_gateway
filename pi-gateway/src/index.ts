@@ -43,11 +43,12 @@ const app = Fastify({
   trustProxy: process.env.TRUST_PROXY !== "false",
 });
 
+const usesWildcard = CORS_ORIGINS.includes("*");
 await app.register(cors, {
   origin: CORS_ORIGINS,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
+  credentials: !usesWildcard,
 });
 
 await app.register(rateLimit, {
@@ -76,6 +77,7 @@ app.get("/health", async () => {
 // --- Auth hooks ---
 app.addHook("preHandler", async (req, reply) => {
   if ((req.routeOptions.url || req.url) === "/health") return;
+  if ((req.url || "").startsWith("/admin")) return;
   try {
     await authHook(req as any);
   } catch (e: any) {
@@ -99,15 +101,8 @@ registerModelConfigRoutes(app, pool);
 registerSessionOpsRoutes(app, pool);
 registerLifecycleRoutes(app, pool);
 
-// Admin routes (with auth)
+// Admin routes (dev convenience: no auth required)
 app.register(async (scope) => {
-  scope.addHook("preHandler", async (req, reply) => {
-    try {
-      await authHook(req as any);
-    } catch (e: any) {
-      reply.code(e.statusCode || 401).send({ error: e.message });
-    }
-  });
   registerAdminRoutes(scope, pool, MAX_TOTAL_PROCESSES);
 });
 

@@ -20,7 +20,13 @@ export function registerChatRoutes(app: FastifyInstance, pool: PiProcessPool) {
     const pi = pool.get(id);
     if (!pi) return reply.code(404).send({ error: "Session not found" });
     if (pi.activeSSEs.size > 0) {
-      return reply.code(409).send({ error: "Session already has an active chat connection" });
+      if (pi.isStreaming) {
+        return reply.code(409).send({ error: "Session already has an active chat connection" });
+      }
+      for (const oldSse of pi.activeSSEs) {
+        (oldSse as any).end();
+      }
+      pi.activeSSEs.clear();
     }
 
     reply.raw.writeHead(200, {
@@ -28,10 +34,14 @@ export function registerChatRoutes(app: FastifyInstance, pool: PiProcessPool) {
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
       "X-Accel-Buffering": "no",
+      "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || "*",
     });
 
     const sse = createSSEWriter(reply.raw);
     pi.activeSSEs.add(sse);
+
+    let streamResolve: () => void;
+    const streamDone = new Promise<void>((r) => { streamResolve = r; });
 
     const unsubscribe = pi.onEvent((event) => {
       pi.resetIdleTimer();
@@ -95,6 +105,13 @@ export function registerChatRoutes(app: FastifyInstance, pool: PiProcessPool) {
         }
       }
 
+      if (event.type === "agent_end") {
+        sse.write("agent_end", event);
+        sse.end();
+        streamResolve();
+        return;
+      }
+
       sse.write(event.type, event);
     });
 
@@ -102,6 +119,7 @@ export function registerChatRoutes(app: FastifyInstance, pool: PiProcessPool) {
       unsubscribe();
       pi.activeSSEs.delete(sse);
       pi.resetIdleTimer();
+      streamResolve();
     });
 
     try {
@@ -111,8 +129,14 @@ export function registerChatRoutes(app: FastifyInstance, pool: PiProcessPool) {
     } catch (err: any) {
       pool.errorsCount++;
       sse.write("error", { message: err.message });
+      unsubscribe();
+      pi.activeSSEs.delete(sse);
       sse.end();
+      streamResolve();
+      return;
     }
+
+    await streamDone;
   });
 
   app.post("/sessions/:id/steer", async (req, reply) => {

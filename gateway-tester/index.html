@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>pi Gateway Tester</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:#0d1117;color:#c9d1d9;height:100vh;overflow:hidden;
+}
+pre,code{font-family:"SF Mono","Fira Code","Cascadia Code",monospace}
+/* toolbar */
+.toolbar{
+  display:flex;align-items:center;gap:10px;padding:8px 12px;
+  background:#161b22;border-bottom:1px solid #21262d;height:44px;
+}
+.toolbar label{font-size:12px;color:#8b949e;white-space:nowrap}
+.toolbar input{
+  background:#0d1117;border:1px solid #30363d;border-radius:4px;
+  color:#c9d1d9;padding:4px 8px;font-size:12px;font-family:inherit;
+}
+.toolbar input:focus{outline:none;border-color:#58a6ff}
+#gateway-url{width:200px}
+#jwt-token{width:260px}
+#conn-status{font-size:11px;padding:2px 8px;border-radius:10px;margin-left:auto}
+.status-ok{background:#033a16;color:#3fb950}
+.status-err{background:#3a0316;color:#f85149}
+.status-check{background:#1a2332;color:#8b949e}
+/* main layout */
+.main{display:flex;height:calc(100vh - 44px)}
+/* sessions panel */
+.sessions-panel{
+  width:220px;min-width:180px;background:#161b22;border-right:1px solid #21262d;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.sessions-header{
+  padding:8px 10px;border-bottom:1px solid #21262d;
+  font-size:12px;font-weight:600;color:#58a6ff;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.sessions-header button{
+  background:#238636;border:none;color:#fff;font-size:18px;line-height:1;
+  width:24px;height:24px;border-radius:4px;cursor:pointer;
+}
+.sessions-header button:hover{background:#2ea043}
+.sessions-list{flex:1;overflow-y:auto;padding:4px}
+.session-item{
+  padding:6px 8px;font-size:11px;border-radius:4px;cursor:pointer;
+  margin-bottom:2px;display:flex;justify-content:space-between;align-items:center;
+  border:1px solid transparent;
+}
+.session-item:hover{background:#1c2128}
+.session-item.active{border-color:#58a6ff;background:#0d419d33}
+.session-item .sid{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-item .del-btn{
+  visibility:hidden;color:#f85149;cursor:pointer;font-size:14px;line-height:1;
+  padding:0 4px;border:none;background:none;
+}
+.session-item:hover .del-btn{visibility:visible}
+.session-item .del-btn:hover{color:#ff7b72}
+.session-actions{
+  padding:6px 10px;border-top:1px solid #21262d;
+  display:flex;flex-direction:column;gap:4px;
+}
+.session-actions button{
+  background:#21262d;border:1px solid #30363d;border-radius:4px;
+  color:#c9d1d9;font-size:11px;padding:5px 8px;cursor:pointer;text-align:left;
+}
+.session-actions button:hover{background:#30363d}
+/* right panel */
+.right-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+/* chat area */
+.chat-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.chat-input-row{
+  display:flex;gap:6px;padding:8px 10px;border-bottom:1px solid #21262d;
+  background:#161b22;
+}
+.chat-input-row input{
+  flex:1;background:#0d1117;border:1px solid #30363d;border-radius:4px;
+  color:#c9d1d9;padding:6px 10px;font-size:13px;font-family:inherit;
+}
+.chat-input-row input:focus{outline:none;border-color:#58a6ff}
+.chat-input-row button{
+  background:#238636;border:none;border-radius:4px;color:#fff;
+  padding:6px 14px;font-size:12px;cursor:pointer;white-space:nowrap;
+}
+.chat-input-row button:hover{background:#2ea043}
+.chat-input-row button.abort{background:#da3633}
+.chat-input-row button.abort:hover{background:#f85149}
+/* output */
+.output{flex:1;overflow-y:auto;padding:8px 10px;font-size:12px;font-family:inherit}
+.output .line{margin-bottom:2px;line-height:1.5;word-break:break-all}
+.output .thinking{color:#8b949e;font-style:italic}
+.output .text{color:#c9d1d9}
+.output .toolcall{color:#d2a8ff;background:#1c1624;padding:2px 6px;border-radius:3px}
+.output .toolexec{color:#a5d6ff;background:#0d1f33;padding:2px 6px;border-radius:3px}
+.output .event{color:#58a6ff;font-size:10px;text-transform:uppercase}
+.output .error{color:#f85149;background:#3a0316;padding:2px 6px;border-radius:3px}
+.output .ui-request{color:#d29922;background:#2a210f;padding:2px 6px;border-radius:3px}
+.output .info{color:#8b949e;font-size:10px}
+.output .divider{color:#30363d;margin:4px 0}
+/* shortcuts panel */
+.shortcuts{
+  border-top:1px solid #21262d;background:#161b22;padding:6px 10px;
+  display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+}
+.shortcuts span{font-size:10px;color:#484f58;text-transform:uppercase;margin-right:4px}
+.shortcuts button{
+  background:#21262d;border:1px solid #30363d;border-radius:4px;
+  color:#c9d1d9;font-size:11px;padding:4px 10px;cursor:pointer;
+}
+.shortcuts button:hover{background:#30363d}
+.shortcuts button.running{background:#d2992222;border-color:#d29922}
+/* response overlay */
+.response-overlay{
+  display:none;position:absolute;top:0;left:0;right:0;bottom:0;
+  background:#0d1117e6;z-index:10;flex-direction:column;
+}
+.response-overlay.show{display:flex}
+.response-header{
+  padding:8px 12px;background:#161b22;border-bottom:1px solid #21262d;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.response-header span{font-size:13px;font-weight:600;color:#58a6ff}
+.response-header button{
+  background:none;border:none;color:#8b949e;font-size:18px;cursor:pointer;
+}
+.response-header button:hover{color:#c9d1d9}
+.response-body{
+  flex:1;overflow:auto;padding:12px;
+}
+.response-body pre{
+  font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-all;
+}
+.scroll-bottom{float:right;font-size:10px;color:#484f58;cursor:pointer}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <label>Gateway:</label>
+  <input id="gateway-url" value="http://localhost:3000" placeholder="http://host:port">
+  <label>Token:</label>
+  <input id="jwt-token" placeholder="JWT token..." type="password">
+  <span id="conn-status" class="status-check">checking...</span>
+</div>
+
+<div class="main">
+  <!-- left: sessions -->
+  <div class="sessions-panel">
+    <div class="sessions-header">
+      Sessions
+      <button id="btn-create-session" title="新建会话">+</button>
+    </div>
+    <div id="sessions-list" class="sessions-list"></div>
+    <div class="session-actions">
+      <button id="btn-delete-session">删除选中会话</button>
+    </div>
+  </div>
+
+  <!-- right: chat + shortcuts + response -->
+  <div class="right-panel" style="position:relative">
+    <div class="chat-area">
+      <div class="chat-input-row">
+        <input id="chat-input" placeholder="输入消息后回车发送..." disabled>
+        <button id="btn-send" disabled>发送</button>
+        <button id="btn-abort" class="abort" style="display:none">中断</button>
+      </div>
+      <div id="output" class="output">
+        <div class="info">等待创建会话...</div>
+      </div>
+    </div>
+    <div class="shortcuts">
+      <span>快捷操作:</span>
+      <button onclick="quickAction('state')">State</button>
+      <button onclick="quickAction('models')">Models</button>
+      <button onclick="quickAction('stats')">Stats</button>
+      <button onclick="quickAction('bash')">Bash: echo ok</button>
+      <button onclick="quickAction('config')">Config</button>
+      <button onclick="quickAction('pending-ui')">Pending UI</button>
+      <button onclick="quickAction('messages')">Messages</button>
+    </div>
+
+    <!-- response overlay -->
+    <div id="response-overlay" class="response-overlay">
+      <div class="response-header">
+        <span id="response-title">Response</span>
+        <button onclick="closeResponse()">&times;</button>
+      </div>
+      <div id="response-body" class="response-body"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+
+// --- state ---
+let currentSessionId = null;
+let abortController = null;
+
+// --- persistence ---
+function savePrefs() {
+  localStorage.setItem('gw-url', $('#gateway-url').value);
+  localStorage.setItem('gw-token', $('#jwt-token').value);
+}
+$('#gateway-url').addEventListener('input', savePrefs);
+$('#jwt-token').addEventListener('input', savePrefs);
+$('#gateway-url').value = localStorage.getItem('gw-url') || 'http://localhost:3000';
+$('#jwt-token').value = localStorage.getItem('gw-token') || '';
+
+function baseUrl(){ return $('#gateway-url').value.replace(/\/+$/, ''); }
+function authHeaders(){ return { 'Authorization': 'Bearer ' + $('#jwt-token').value, 'Content-Type': 'application/json' }; }
+
+// --- connection check ---
+async function checkConnection(){
+  const s = $('#conn-status');
+  s.className = 'status-check'; s.textContent = 'checking...';
+  try {
+    const r = await fetch(baseUrl() + '/health');
+    if (r.ok && (await r.json()).status === 'ok') { s.className = 'status-ok'; s.textContent = 'connected'; return true; }
+  } catch(e) {}
+  s.className = 'status-err'; s.textContent = 'disconnected'; return false;
+}
+$('#gateway-url').addEventListener('change', checkConnection);
+$('#gateway-url').addEventListener('blur', checkConnection);
+checkConnection();
+
+// --- output ---
+let streamBlock = null;
+
+function outputAppend(html) {
+  const o = $('#output');
+  o.insertAdjacentHTML('beforeend', html);
+  o.scrollTop = o.scrollHeight;
+}
+function outputAppendBlock(tag, cls) {
+  streamBlock = document.createElement(tag);
+  streamBlock.className = cls;
+  $('#output').appendChild(streamBlock);
+  $('#output').scrollTop = $('#output').scrollHeight;
+}
+function outputAppendStream(text) {
+  if (streamBlock) streamBlock.textContent += text;
+  $('#output').scrollTop = $('#output').scrollHeight;
+}
+function outputEndStream() { streamBlock = null; }
+function outputClear() { $('#output').innerHTML = ''; streamBlock = null; }
+
+// --- response overlay ---
+function showResponse(title, text) {
+  $('#response-title').textContent = title;
+  $('#response-body').innerHTML = '<pre>' + escapeHtml(text) + '</pre>';
+  $('#response-overlay').classList.add('show');
+}
+function closeResponse() { $('#response-overlay').classList.remove('show'); }
+
+function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// --- sessions ---
+async function createSession(){
+  try {
+    const r = await fetch(baseUrl() + '/sessions', { method:'POST', headers:authHeaders(), body:'{}' });
+    const d = await r.json();
+    if (!r.ok) { alert('创建失败: ' + (d.error || d.message || r.status)); return; }
+    currentSessionId = d.sessionId;
+    await listSessions();
+    enableChat();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function listSessions(){
+  try {
+    const r = await fetch(baseUrl() + '/admin/api/sessions', { headers:authHeaders() });
+    const d = await r.json();
+    const list = $('#sessions-list');
+    if (!d.sessions || d.sessions.length === 0) {
+      list.innerHTML = '<div style="font-size:11px;color:#484f58;padding:8px">无活跃会话</div>';
+      return;
+    }
+    list.innerHTML = d.sessions.map(s => {
+      const active = s.sessionId === currentSessionId ? ' active' : '';
+      const sid = s.sessionId.replace(/"/g, '&quot;');
+      return `<div class="session-item${active}" data-sid="${sid}">
+        <span class="sid" title="${sid}">${sid.slice(0,16)}...</span>
+        <button class="del-btn" data-del="${sid}" title="删除">&times;</button>
+      </div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+async function deleteSession(sid){
+  if (!confirm('删除会话 ' + sid.slice(0,20) + '... ?')) return;
+  await fetch(baseUrl() + '/sessions/' + sid, { method:'DELETE', headers:authHeaders() });
+  if (currentSessionId === sid) {
+    currentSessionId = null;
+    disableChat();
+  }
+  await listSessions();
+}
+
+function selectSession(sid){
+  currentSessionId = sid;
+  listSessions();
+  enableChat();
+}
+
+function enableChat(){
+  $('#chat-input').disabled = false;
+  $('#btn-send').disabled = false;
+  $('#chat-input').focus();
+}
+function disableChat(){
+  $('#chat-input').disabled = true;
+  $('#btn-send').disabled = true;
+  currentSessionId = null;
+}
+
+// --- chat SSE ---
+async function sendChat(){
+  if (!currentSessionId) return alert('请先选择或创建会话');
+  const msg = $('#chat-input').value.trim();
+  if (!msg) return;
+
+  outputClear();
+  outputAppend('<div class="info">发送: ' + escapeHtml(msg) + '</div><div class="divider">---</div>');
+
+  const btn = $('#btn-send');
+  const abortBtn = $('#btn-abort');
+  btn.style.display = 'none';
+  abortBtn.style.display = '';
+  $('#chat-input').disabled = true;
+
+  abortController = new AbortController();
+
+  try {
+    const r = await fetch(baseUrl() + '/sessions/' + currentSessionId + '/chat', {
+      method:'POST', headers:authHeaders(),
+      body: JSON.stringify({ message: msg }),
+      signal: abortController.signal,
+    });
+
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: r.statusText }));
+      outputAppend('<div class="error">HTTP ' + r.status + ': ' + (err.error || err.message) + '</div>');
+      return;
+    }
+
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+
+      while (true) {
+        buf = buf.replace(/\r\n/g, '\n');
+        const idx = buf.indexOf('\n\n');
+        if (idx === -1) break;
+        const frame = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+
+        if (frame.startsWith(':')) { outputAppend('<div class="info">♥ heartbeat</div>'); continue; }
+
+        const em = frame.match(/^event: (.+)/m);
+        const dm = frame.match(/^data: (.+)/m);
+        if (!em || !dm) continue;
+
+        const type = em[1];
+        let payload;
+        try { payload = JSON.parse(dm[1]); } catch(e) { continue; }
+
+        renderSSEEvent(type, payload);
+      }
+    }
+  } catch(e) {
+    if (e.name !== 'AbortError') outputAppend('<div class="error">' + escapeHtml(e.message) + '</div>');
+  } finally {
+    btn.style.display = '';
+    abortBtn.style.display = 'none';
+    $('#chat-input').disabled = false;
+    $('#chat-input').focus();
+    abortController = null;
+  }
+}
+
+function abortChat(){
+  if (abortController) abortController.abort();
+  if (currentSessionId) {
+    fetch(baseUrl() + '/sessions/' + currentSessionId + '/abort', { method:'POST', headers:authHeaders() }).catch(()=>{});
+  }
+}
+
+function renderSSEEvent(type, p) {
+  switch (type) {
+    case 'agent_start':
+      outputAppend('<div class="event">◆ agent_start</div>');
+      break;
+    case 'agent_end':
+      outputAppend('<div class="event">◆ agent_end</div>');
+      if (p.messages) {
+        const last = p.messages[p.messages.length - 1];
+        if (last?.usage) {
+          outputAppend('<div class="info">tokens: ' + (last.usage.totalTokens ?? 'N/A') + ' | cost: $' + (last.usage.cost?.total ?? 0).toFixed(6) + '</div>');
+        }
+      }
+      break;
+    case 'turn_start':
+      outputAppend('<div class="event">↻ turn_start</div>');
+      break;
+    case 'turn_end':
+      outputAppend('<div class="event">↻ turn_end</div>');
+      break;
+    case 'message_start':
+      outputAppend('<div class="event">▶ message_start</div>');
+      break;
+    case 'message_end':
+      outputAppend('<div class="event">◼ message_end</div>');
+      break;
+    case 'message_update': {
+      const sub = p.assistantMessageEvent;
+      if (!sub) return;
+      switch(sub.type) {
+        case 'thinking_start':
+          outputAppendBlock('div', 'thinking');
+          break;
+        case 'thinking_delta':
+          outputAppendStream(sub.delta || '');
+          break;
+        case 'thinking_end':
+          outputEndStream();
+          break;
+        case 'text_start':
+          outputAppendBlock('div', 'text');
+          break;
+        case 'text_delta':
+          outputAppendStream(sub.delta || '');
+          break;
+        case 'text_end':
+          outputEndStream();
+          break;
+        case 'toolcall_start':
+          outputAppend('<div class="toolcall">▶ toolcall: ' + escapeHtml(sub.toolCall?.name || '') + ' #' + (sub.toolCall?.id || '').slice(0,8) + '</div>');
+          break;
+        case 'toolcall_delta':
+          outputAppend('<span class="toolcall">' + escapeHtml(sub.delta || '') + '</span>');
+          break;
+        case 'toolcall_end':
+          outputAppend('<div class="toolcall">◼ toolcall_end</div>');
+          break;
+        case 'done':
+          outputAppend('<div class="info">done (' + (sub.reason || '') + ')</div>');
+          break;
+        default:
+          outputAppend('<div class="info">message_update.' + sub.type + '</div>');
+      }
+      break;
+    }
+    case 'tool_execution_start':
+      outputAppend('<div class="toolexec">▶ exec: ' + escapeHtml(p.toolName || '') + '</div>');
+      break;
+    case 'tool_execution_update':
+      break;
+    case 'tool_execution_end':
+      outputAppend('<div class="toolexec">◼ exec_end (error=' + (p.isError || false) + ')</div>');
+      if (p.result?.content?.[0]?.text) {
+        outputAppend('<pre class="toolexec">' + escapeHtml(p.result.content[0].text.slice(0, 500)) + '</pre>');
+      }
+      break;
+    case 'compaction_start':
+    case 'compaction_end':
+      outputAppend('<div class="info">' + type + '</div>');
+      break;
+    case 'auto_retry_start':
+    case 'auto_retry_end':
+      outputAppend('<div class="info">' + type + ' (' + JSON.stringify(p) + ')</div>');
+      break;
+    case 'queue_update':
+      outputAppend('<div class="info">queue: steering=' + (p.steering?.length||0) + ' followUp=' + (p.followUp?.length||0) + '</div>');
+      break;
+    case 'user_question':
+      outputAppend('<div class="ui-request">❓ UI 请求 [' + escapeHtml(p.method) + ']: ' + escapeHtml(p.title) + ' (id=' + p.id + ')</div>');
+      if (p.message) outputAppend('<div class="ui-request">   ' + escapeHtml(p.message) + '</div>');
+      break;
+    case 'notification':
+      outputAppend('<div class="info">🔔 ' + escapeHtml(p.message) + '</div>');
+      break;
+    case 'status_update':
+      outputAppend('<div class="info">📊 ' + escapeHtml(p.statusKey) + ': ' + escapeHtml(p.statusText) + '</div>');
+      break;
+    case 'widget_update':
+      outputAppend('<div class="info">📦 widget ' + escapeHtml(p.widgetKey) + '</div>');
+      break;
+    case 'title_update':
+      outputAppend('<div class="info">📝 title: ' + escapeHtml(p.title) + '</div>');
+      break;
+    case 'editor_text_update':
+      outputAppend('<div class="info">📄 editor_text_update</div>');
+      break;
+    case 'extension_error':
+      outputAppend('<div class="error">extension_error: ' + escapeHtml(p.error || '') + '</div>');
+      break;
+    case 'error':
+      outputAppend('<div class="error">⚠ ' + escapeHtml(p.message || '') + '</div>');
+      break;
+    default:
+      outputAppend('<div class="info">event: ' + type + '</div>');
+  }
+}
+
+// --- shortcuts ---
+async function quickAction(action) {
+  if (!currentSessionId) { alert('请先选择或创建会话'); return; }
+  const sid = currentSessionId;
+  let url, method = 'GET', body;
+
+  switch(action){
+    case 'state': url = '/sessions/' + sid + '/state'; break;
+    case 'models': url = '/sessions/' + sid + '/models'; break;
+    case 'stats': url = '/sessions/' + sid + '/stats'; break;
+    case 'bash': url = '/sessions/' + sid + '/bash'; method = 'POST'; body = JSON.stringify({command: 'echo ok'}); break;
+    case 'config': url = '/sessions/' + sid + '/config'; method = 'PUT'; break;
+    case 'pending-ui': url = '/sessions/' + sid + '/pending-ui-requests'; break;
+    case 'messages': url = '/sessions/' + sid + '/messages'; break;
+  }
+
+  try {
+    const opts = { method, headers: authHeaders() };
+    if (body) opts.body = body;
+    const r = await fetch(baseUrl() + url, opts);
+    const text = JSON.stringify(await r.json(), null, 2);
+    showResponse(action.toUpperCase() + ' - HTTP ' + r.status, text);
+  } catch(e) {
+    showResponse(action, 'Error: ' + e.message);
+  }
+}
+
+// --- setup event listeners ---
+$('#btn-create-session').addEventListener('click', createSession);
+$('#btn-delete-session').addEventListener('click', () => {
+  if (!currentSessionId) return alert('请先选择会话');
+  deleteSession(currentSessionId);
+});
+$('#btn-send').addEventListener('click', sendChat);
+$('#btn-abort').addEventListener('click', abortChat);
+$('#chat-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); }
+});
+$('#sessions-list').addEventListener('click', (e) => {
+  const item = e.target.closest('.session-item');
+  if (!item) return;
+  if (e.target.closest('.del-btn')) {
+    deleteSession(item.dataset.sid);
+    return;
+  }
+  selectSession(item.dataset.sid);
+});
+// close response overlay on Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeResponse();
+});
+
+// poll sessions list periodically
+setInterval(() => { if (currentSessionId) listSessions(); }, 5000);
+setInterval(checkConnection, 30000);
+
+// startup
+setTimeout(listSessions, 1000);
+</script>
+</body>
+</html>
