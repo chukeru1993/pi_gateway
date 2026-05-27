@@ -29,7 +29,7 @@ export class PiProcess {
   private idleTimer?: ReturnType<typeof setTimeout>;
   private memoryTimer?: ReturnType<typeof setInterval>;
   private hangTimer?: ReturnType<typeof setTimeout>;
-  private readonly HANG_TIMEOUT = 5 * 60_000;
+  private readonly HANG_TIMEOUT = parseInt(process.env.HANG_TIMEOUT_MINUTES || "5", 10) * 60_000;
   public intentionalShutdown = false;
   private onIdleTimeout: (() => void) | undefined;
   private onMemoryEvict: (() => void) | undefined;
@@ -171,6 +171,7 @@ export class PiProcess {
   }
 
   async sendCommand(cmd: any, timeout = 30_000): Promise<any> {
+    this.resetHangTimer();
     const id = `req_${++this.requestId}`;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -223,6 +224,7 @@ export class PiProcess {
   resetIdleTimer() {
     if (!this.idleTimer) return;
     this.idleTimer.refresh();
+    this.resetHangTimer();
   }
 
   startMemoryMonitor(maxBytes: number) {

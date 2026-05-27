@@ -91,16 +91,14 @@ pre,code{font-family:"SF Mono","Fira Code","Cascadia Code",monospace}
 .chat-input-row button.abort:hover{background:#f85149}
 /* output */
 .output{flex:1;overflow-y:auto;padding:8px 10px;font-size:12px;font-family:inherit}
-.output .line{margin-bottom:2px;line-height:1.5;word-break:break-all}
-.output .thinking{color:#8b949e;font-style:italic}
-.output .text{color:#c9d1d9}
-.output .toolcall{color:#d2a8ff;background:#1c1624;padding:2px 6px;border-radius:3px}
-.output .toolexec{color:#a5d6ff;background:#0d1f33;padding:2px 6px;border-radius:3px}
-.output .event{color:#58a6ff;font-size:10px;text-transform:uppercase}
-.output .error{color:#f85149;background:#3a0316;padding:2px 6px;border-radius:3px}
-.output .ui-request{color:#d29922;background:#2a210f;padding:2px 6px;border-radius:3px}
-.output .info{color:#8b949e;font-size:10px}
-.output .divider{color:#30363d;margin:4px 0}
+    .output .line{margin-bottom:2px;line-height:1.5;word-break:break-all}
+    .output .thinking{color:#8b949e;font-style:italic}
+    .output .text{color:#c9d1d9}
+    .output .event{color:#58a6ff;font-size:10px;text-transform:uppercase}
+    .output .error{color:#f85149;background:#3a0316;padding:2px 6px;border-radius:3px}
+    .output .ui-request{color:#d29922;background:#2a210f;padding:2px 6px;border-radius:3px}
+    .output .info{color:#8b949e;font-size:10px}
+    .output .divider{color:#30363d;margin:4px 0}
 /* shortcuts panel */
 .shortcuts{
   border-top:1px solid #21262d;background:#161b22;padding:6px 10px;
@@ -135,7 +133,68 @@ pre,code{font-family:"SF Mono","Fira Code","Cascadia Code",monospace}
   font-size:12px;line-height:1.6;white-space:pre-wrap;word-break:break-all;
 }
 .scroll-bottom{float:right;font-size:10px;color:#484f58;cursor:pointer}
-</style>
+  /* markdown content styles */
+  .md-content p{margin:4px 0;line-height:1.6}
+  .md-content code{font-family:"SF Mono","Fira Code","Cascadia Code",monospace;font-size:11px;background:#1c2128;padding:1px 5px;border-radius:3px}
+  .md-content pre{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:10px 12px;overflow-x:auto;margin:6px 0}
+  .md-content pre code{background:none;padding:0;font-size:11px;line-height:1.5;color:#c9d1d9}
+  .md-content blockquote{border-left:3px solid #58a6ff;padding:4px 12px;margin:6px 0;color:#8b949e}
+  .md-content ul,.md-content ol{padding-left:24px;margin:4px 0}
+  .md-content li{line-height:1.6}
+  .md-content table{border-collapse:collapse;margin:6px 0;width:100%}
+  .md-content th,.md-content td{border:1px solid #30363d;padding:4px 10px;font-size:11px;text-align:left}
+  .md-content th{background:#1c2128}
+  .md-content h1,.md-content h2,.md-content h3,.md-content h4{font-weight:600;margin:10px 0 4px;line-height:1.3}
+  .md-content h1{font-size:16px;color:#58a6ff}
+  .md-content h2{font-size:14px;color:#58a6ff}
+  .md-content h3{font-size:13px;color:#c9d1d9}
+  .md-content hr{border:none;border-top:1px solid #30363d;margin:8px 0}
+  .md-content a{color:#58a6ff;text-decoration:none}
+  .md-content a:hover{text-decoration:underline}
+  .md-content strong{font-weight:600;color:#e6edf3}
+  .md-content em{font-style:italic}
+/* message bubbles */
+.msg{margin:8px 0;max-width:85%;clear:both}
+  .msg-user{float:right}
+  .msg-user .msg-content{background:#1f6feb33;color:#c9d1d9;border-radius:12px 12px 2px 12px;padding:10px 14px;font-size:13px;word-break:break-word;border:1px solid #1f6feb66;box-shadow:0 1px 3px #0003}
+  .msg-ai{float:left;width:100%}
+  .msg-ai .msg-content{background:#161b22;border:1px solid #30363d;border-radius:12px 12px 12px 2px;padding:10px 14px;font-size:13px;word-break:break-word;box-shadow:0 1px 3px #0003}
+  .msg-ai .msg-label{font-size:10px;color:#8b949e;margin-bottom:4px;font-weight:600}
+  .msg::after{content:"";display:table;clear:both}
+  /* thinking block */
+  .thinking-block{margin:8px 0;border:1px dashed #30363d;border-radius:8px;background:#0d1117;overflow:hidden}
+  .thinking-header{font-size:11px;color:#8b949e;padding:6px 12px;background:#161b22;border-bottom:1px dashed #30363d;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none}
+  .thinking-header:hover{color:#c9d1d9}
+  .thinking-body{padding:8px 12px;font-size:12px;color:#8b949e;font-style:italic;line-height:1.6;white-space:pre-wrap;word-break:break-word;display:none}
+  .thinking-body.expanded{display:block}
+  .thinking-toggle{font-size:10px;color:#484f58}
+  /* tool call block */
+  .toolcall-block{margin:8px 0;border:1px solid #30203f;border-radius:8px;background:#16101f;overflow:hidden}
+  .toolcall-header{font-size:11px;color:#d2a8ff;padding:6px 12px;background:#1c1026;border-bottom:1px solid #30203f;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+  .toolcall-header:hover{background:#251236}
+  .toolcall-body{padding:8px 12px;font-size:12px;display:none}
+  .toolcall-body.expanded{display:block}
+   .toolcall-body pre{margin:0;background:#0d1117;border:1px solid #30203f;border-radius:6px;padding:8px 10px;overflow-x:auto;font-size:11px;line-height:1.5;color:#c9d1d9}
+  .toolcall-body code{font-size:11px;color:#d2a8ff;background:#0d1117}
+  .toolcall-body .md-content p{margin:4px 0;line-height:1.5}
+  .toolcall-body .md-content code{font-family:monospace;font-size:11px;background:#0d1117;padding:1px 4px;border-radius:3px;color:#d2a8ff}
+  .toolcall-body .md-content pre{background:#0d1117;border:1px solid #30203f;border-radius:6px;padding:8px 10px;overflow-x:auto;margin:4px 0}
+  .toolcall-body .md-content pre code{background:none;padding:0;color:#c9d1d9}
+  /* tool execution block */
+  .toolexec-block{margin:8px 0;background:#0d1f33;border:1px solid #1f3a5f;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px #0003}
+  .toolexec-header{font-size:11px;color:#a5d6ff;padding:6px 12px;background:#0a1628;border-bottom:1px solid #1f3a5f;font-family:monospace;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none}
+  .toolexec-header:hover{background:#0d1f33}
+  .toolexec-body{padding:8px 12px;font-size:12px;display:none}
+  .toolexec-body.expanded{display:block}
+  .toolexec-body pre{margin:0;background:#0d1117;border:1px solid #1f3a5f;border-radius:6px;padding:8px 10px;overflow-x:auto;max-height:400px;font-size:11px;line-height:1.5;color:#c9d1d9}
+  .toolexec-body .md-content p{margin:4px 0;line-height:1.5}
+  .toolexec-body .md-content code{font-family:monospace;font-size:11px;background:#0d1117;padding:1px 4px;border-radius:3px;color:#a5d6ff}
+  .toolexec-body .md-content pre{background:#0d1117;border:1px solid #1f3a5f;border-radius:6px;padding:8px 10px;overflow-x:auto;margin:4px 0}
+  .toolexec-body .md-content pre code{background:none;padding:0;color:#c9d1d9}
+  .toolexec-exit{font-size:10px;color:#484f58;padding:4px 12px;border-top:1px solid #1f3a5f;background:#0a1628}
+  /* usage info */
+  .msg-meta{font-size:10px;color:#484f58;text-align:right;margin-top:4px}
+  </style>
 </head>
 <body>
 
@@ -201,6 +260,7 @@ const $$ = (s) => document.querySelectorAll(s);
 // --- state ---
 let currentSessionId = null;
 let abortController = null;
+let currentMsgContent = null;
 
 // --- persistence ---
 function savePrefs() {
@@ -231,24 +291,51 @@ checkConnection();
 
 // --- output ---
 let streamBlock = null;
+let streamBuffer = '';
+let streamBlockType = '';
+const toolcallBlocks = {};
 
 function outputAppend(html) {
-  const o = $('#output');
-  o.insertAdjacentHTML('beforeend', html);
-  o.scrollTop = o.scrollHeight;
+  const target = currentMsgContent || $('#output');
+  target.insertAdjacentHTML('beforeend', html);
+  $('#output').scrollTop = $('#output').scrollHeight;
 }
 function outputAppendBlock(tag, cls) {
   streamBlock = document.createElement(tag);
   streamBlock.className = cls;
-  $('#output').appendChild(streamBlock);
+  streamBuffer = '';
+  streamBlockType = cls;
+  const target = currentMsgContent || $('#output');
+  target.appendChild(streamBlock);
   $('#output').scrollTop = $('#output').scrollHeight;
+}
+function outputAppendTo(block) {
+  streamBlock = block;
+  streamBuffer = block.textContent || '';
+  streamBlockType = 'custom';
 }
 function outputAppendStream(text) {
-  if (streamBlock) streamBlock.textContent += text;
+  if (streamBlock) {
+    streamBuffer += text;
+    if (streamBlockType === 'text') {
+      streamBlock.textContent = streamBuffer;
+    } else {
+      streamBlock.textContent += text;
+    }
+  }
   $('#output').scrollTop = $('#output').scrollHeight;
 }
-function outputEndStream() { streamBlock = null; }
-function outputClear() { $('#output').innerHTML = ''; streamBlock = null; }
+function outputEndStream() {
+  if (streamBlock && (streamBlockType === 'text' || streamBlock?.className === 'text') && streamBuffer) {
+    streamBlock.className += ' md-content';
+    streamBlock.innerHTML = renderMarkdown(streamBuffer);
+  }
+  streamBlock = null;
+  streamBuffer = '';
+  streamBlockType = '';
+  $('#output').scrollTop = $('#output').scrollHeight;
+}
+function outputClear() { $('#output').innerHTML = ''; streamBlock = null; streamBuffer = ''; streamBlockType = ''; currentMsgContent = null; Object.keys(toolcallBlocks).forEach(k => delete toolcallBlocks[k]); }
 
 // --- response overlay ---
 function showResponse(title, text) {
@@ -259,6 +346,52 @@ function showResponse(title, text) {
 function closeResponse() { $('#response-overlay').classList.remove('show'); }
 
 function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderMarkdown(text) {
+  if (!text) return escapeHtml(text || '');
+  try {
+    if (typeof marked !== 'undefined' && marked.parse) {
+      return marked.parse(text);
+    }
+  } catch(e) {}
+  return escapeHtml(text).replace(/\n/g, '<br>');
+}
+
+function extractToolResult(result) {
+  if (!result) return undefined;
+  if (typeof result === 'string') return result;
+  if (result.content) {
+    if (Array.isArray(result.content)) {
+      const first = result.content[0];
+      if (first && typeof first === 'object' && 'text' in first) return first.text;
+      if (first && typeof first === 'string') return first;
+    } else if (typeof result.content === 'string') {
+      return result.content;
+    }
+  }
+  if (result.output) return result.output;
+  if (result.stdout) return result.stdout;
+  if (result.stderr) return result.stderr;
+  if (result.text) return result.text;
+  if (result.message) return result.message;
+  if (result.details && Object.keys(result.details).length > 0) {
+    return JSON.stringify(result.details, null, 2);
+  }
+  return undefined;
+}
+
+function toggleFold(parentId, bodyClass) {
+  const parent = document.getElementById(parentId);
+  if (!parent) return;
+  const body = parent.querySelector('.' + bodyClass);
+  if (!body) return;
+  const isExpanded = body.classList.toggle('expanded');
+  const header = parent.querySelector('.thinking-header, .toolcall-header, .toolexec-header');
+  if (header) {
+    const toggleSpan = header.querySelector('.thinking-toggle, .fold-toggle');
+    if (toggleSpan) toggleSpan.textContent = isExpanded ? '点击折叠' : '点击展开';
+  }
+}
 
 // --- sessions ---
 async function createSession(){
@@ -324,9 +457,9 @@ async function sendChat(){
   if (!currentSessionId) return alert('请先选择或创建会话');
   const msg = $('#chat-input').value.trim();
   if (!msg) return;
+  $('#chat-input').value = '';
 
-  outputClear();
-  outputAppend('<div class="info">发送: ' + escapeHtml(msg) + '</div><div class="divider">---</div>');
+  outputAppend('<div class="divider"></div><div class="msg msg-user"><div class="msg-content">' + escapeHtml(msg) + '</div></div>');
 
   const btn = $('#btn-send');
   const abortBtn = $('#btn-abort');
@@ -398,42 +531,63 @@ function abortChat(){
 
 function renderSSEEvent(type, p) {
   switch (type) {
-    case 'agent_start':
-      outputAppend('<div class="event">◆ agent_start</div>');
+    case 'agent_start': {
+      const msg = document.createElement('div');
+      msg.className = 'msg msg-ai';
+      msg.innerHTML = '<div class="msg-label">pi</div>';
+      const content = document.createElement('div');
+      content.className = 'msg-content';
+      msg.appendChild(content);
+      $('#output').appendChild(msg);
+      currentMsgContent = content;
       break;
+    }
     case 'agent_end':
-      outputAppend('<div class="event">◆ agent_end</div>');
+      outputEndStream();
       if (p.messages) {
         const last = p.messages[p.messages.length - 1];
         if (last?.usage) {
-          outputAppend('<div class="info">tokens: ' + (last.usage.totalTokens ?? 'N/A') + ' | cost: $' + (last.usage.cost?.total ?? 0).toFixed(6) + '</div>');
+          const meta = document.createElement('div');
+          meta.className = 'msg-meta';
+          meta.textContent = 'tokens: ' + (last.usage.totalTokens ?? 'N/A') + ' | cost: $' + (last.usage.cost?.total ?? 0).toFixed(6);
+          currentMsgContent.appendChild(meta);
         }
       }
+      currentMsgContent = null;
       break;
     case 'turn_start':
-      outputAppend('<div class="event">↻ turn_start</div>');
-      break;
     case 'turn_end':
-      outputAppend('<div class="event">↻ turn_end</div>');
-      break;
     case 'message_start':
-      outputAppend('<div class="event">▶ message_start</div>');
-      break;
     case 'message_end':
-      outputAppend('<div class="event">◼ message_end</div>');
       break;
     case 'message_update': {
       const sub = p.assistantMessageEvent;
       if (!sub) return;
       switch(sub.type) {
-        case 'thinking_start':
-          outputAppendBlock('div', 'thinking');
+        case 'thinking_start': {
+          const id = 'th-' + Math.random().toString(36).slice(2,8);
+          const block = document.createElement('div');
+          block.className = 'thinking-block';
+          block.id = id;
+          const header = document.createElement('div');
+          header.className = 'thinking-header';
+          header.innerHTML = '💭 Thinking<span class="thinking-toggle">点击展开</span>';
+          header.onclick = () => toggleFold(id, 'thinking-body');
+          const body = document.createElement('div');
+          body.className = 'thinking-body';
+          block.appendChild(header);
+          block.appendChild(body);
+          currentMsgContent.appendChild(block);
+          outputAppendTo(body);
           break;
+        }
         case 'thinking_delta':
           outputAppendStream(sub.delta || '');
           break;
         case 'thinking_end':
-          outputEndStream();
+          streamBlock = null;
+          streamBuffer = '';
+          streamBlockType = '';
           break;
         case 'text_start':
           outputAppendBlock('div', 'text');
@@ -444,63 +598,144 @@ function renderSSEEvent(type, p) {
         case 'text_end':
           outputEndStream();
           break;
-        case 'toolcall_start':
-          outputAppend('<div class="toolcall">▶ toolcall: ' + escapeHtml(sub.toolCall?.name || '') + ' #' + (sub.toolCall?.id || '').slice(0,8) + '</div>');
+        case 'toolcall_start': {
+          const contentBlock = sub.partial?.content?.[sub.contentIndex];
+          const name = escapeHtml((contentBlock?.name) || '');
+          const tcId = (contentBlock?.id || '').slice(0,8);
+          const argsObj = contentBlock?.arguments || contentBlock?.args || {};
+          const id = 'tc-' + Math.random().toString(36).slice(2,8);
+          toolcallBlocks[id] = { argsObj, name, tcId };
+          let argsHtml = '';
+          try {
+            const argsStr = typeof argsObj === 'string' ? argsObj : JSON.stringify(argsObj, null, 2);
+            argsHtml = '<pre><code>' + escapeHtml(argsStr) + '</code></pre>';
+          } catch(e) { argsHtml = '<pre><code>' + escapeHtml(String(argsObj)) + '</code></pre>'; }
+          outputAppend('<div class="toolcall-block" id="' + id + '"><div class="toolcall-header" onclick="toggleFold(\'' + id + '\',\'toolcall-body\')">🔧 ' + name + ' <span style="color:#8b949e">#' + tcId + '</span><span class="fold-toggle" style="margin-left:auto;font-size:10px;color:#d2a8ff">点击展开</span></div><div class="toolcall-body">' + argsHtml + '</div></div>');
           break;
-        case 'toolcall_delta':
-          outputAppend('<span class="toolcall">' + escapeHtml(sub.delta || '') + '</span>');
+        }
+        case 'toolcall_delta': {
+          const delta = sub.delta || '';
+          for (const [_id, block] of Object.entries(toolcallBlocks)) {
+            if (block.argsObj && typeof block.argsObj === 'string') {
+              block.argsObj += delta;
+            }
+          }
           break;
-        case 'toolcall_end':
-          outputAppend('<div class="toolcall">◼ toolcall_end</div>');
+        }
+        case 'toolcall_end': {
+          const finalTc = sub.toolCall || {};
+          for (const [id, block] of Object.entries(toolcallBlocks)) {
+            if (block.name === finalTc.name && (!block.tcId || block.tcId === (finalTc.id || '').slice(0,8))) {
+              const el = document.getElementById(id);
+              if (el) {
+                const body = el.querySelector('.toolcall-body');
+                const argsStr = typeof finalTc.arguments === 'string'
+                  ? finalTc.arguments
+                  : JSON.stringify(finalTc.arguments || finalTc.args || block.argsObj, null, 2);
+                if (body) body.innerHTML = '<pre><code>' + escapeHtml(argsStr) + '</code></pre>';
+                const header = el.querySelector('.toolcall-header');
+                if (header) {
+                  header.innerHTML = '🔧 ' + escapeHtml(finalTc.name || block.name)
+                    + ' <span style="color:#8b949e">#' + ((finalTc.id || '').slice(0,8) || block.tcId) + '</span>'
+                    + '<span class="fold-toggle" style="margin-left:auto;font-size:10px;color:#d2a8ff">点击展开</span>';
+                  header.onclick = () => toggleFold(id, 'toolcall-body');
+                }
+              }
+              delete toolcallBlocks[id];
+              break;
+            }
+          }
           break;
+        }
         case 'done':
-          outputAppend('<div class="info">done (' + (sub.reason || '') + ')</div>');
+          outputEndStream();
+          outputAppend('<div class="info" style="margin:6px 0">✅ done (' + (sub.reason || '') + ')</div>');
           break;
         default:
           outputAppend('<div class="info">message_update.' + sub.type + '</div>');
       }
       break;
     }
-    case 'tool_execution_start':
-      outputAppend('<div class="toolexec">▶ exec: ' + escapeHtml(p.toolName || '') + '</div>');
+    case 'tool_execution_start': {
+      const id = 'te-' + Math.random().toString(36).slice(2,8);
+      const block = document.createElement('div');
+      block.className = 'toolexec-block';
+      block.id = id;
+      const header = document.createElement('div');
+      header.className = 'toolexec-header';
+      const argsPreview = p.args ? JSON.stringify(p.args, null, 2) : '';
+      const truncated = argsPreview.length > 120 ? argsPreview.slice(0, 120) + '...' : argsPreview;
+      header.innerHTML = '▶ exec: ' + escapeHtml(p.toolName || '') + ' <span style="color:#484f58;font-size:10px">' + escapeHtml(truncated) + '</span><span class="fold-toggle" style="margin-left:auto;font-size:10px;color:#a5d6ff">点击展开</span>';
+      header.onclick = () => toggleFold(id, 'toolexec-body');
+      const body = document.createElement('div');
+      body.className = 'toolexec-body';
+      if (argsPreview) {
+        body.innerHTML = '<pre><code>' + escapeHtml(argsPreview) + '</code></pre><div class="md-content"></div>';
+      }
+      block.appendChild(header);
+      block.appendChild(body);
+      currentMsgContent.appendChild(block);
       break;
+    }
     case 'tool_execution_update':
       break;
-    case 'tool_execution_end':
-      outputAppend('<div class="toolexec">◼ exec_end (error=' + (p.isError || false) + ')</div>');
-      if (p.result?.content?.[0]?.text) {
-        outputAppend('<pre class="toolexec">' + escapeHtml(p.result.content[0].text.slice(0, 500)) + '</pre>');
+    case 'tool_execution_end': {
+      const blocks = currentMsgContent.querySelectorAll('.toolexec-block');
+      const block = blocks[blocks.length - 1];
+      if (block) {
+        const body = block.querySelector('.toolexec-body');
+        if (body) {
+          const text = extractToolResult(p.result);
+          body.classList.add('expanded');
+          let mdContainer = body.querySelector('.md-content');
+          if (!mdContainer) {
+            mdContainer = document.createElement('div');
+            mdContainer.className = 'md-content';
+            body.appendChild(mdContainer);
+          }
+          if (text !== undefined && text !== null && text !== '') {
+            mdContainer.innerHTML = renderMarkdown(text);
+          } else {
+            const empty = document.createElement('div');
+            empty.style.cssText = 'font-size:11px;color:#484f58;font-style:italic;padding:4px 0';
+            empty.textContent = '(no output)';
+            mdContainer.appendChild(empty);
+          }
+        }
+        const exit = document.createElement('div');
+        exit.className = 'toolexec-exit';
+        exit.textContent = 'exit: ' + (p.isError ? 'error' : 'ok');
+        block.appendChild(exit);
       }
       break;
+    }
     case 'compaction_start':
     case 'compaction_end':
-      outputAppend('<div class="info">' + type + '</div>');
-      break;
     case 'auto_retry_start':
     case 'auto_retry_end':
-      outputAppend('<div class="info">' + type + ' (' + JSON.stringify(p) + ')</div>');
-      break;
     case 'queue_update':
-      outputAppend('<div class="info">queue: steering=' + (p.steering?.length||0) + ' followUp=' + (p.followUp?.length||0) + '</div>');
-      break;
-    case 'user_question':
-      outputAppend('<div class="ui-request">❓ UI 请求 [' + escapeHtml(p.method) + ']: ' + escapeHtml(p.title) + ' (id=' + p.id + ')</div>');
-      if (p.message) outputAppend('<div class="ui-request">   ' + escapeHtml(p.message) + '</div>');
+      outputAppend('<div class="info">' + escapeHtml(
+        type === 'queue_update' ? ('queue: s=' + (p.steering?.length||0) + ' f=' + (p.followUp?.length||0)) : type
+      ) + '</div>');
       break;
     case 'notification':
-      outputAppend('<div class="info">🔔 ' + escapeHtml(p.message) + '</div>');
+      outputAppend('<div class="info">🔔 ' + escapeHtml(p.message || '') + '</div>');
       break;
     case 'status_update':
       outputAppend('<div class="info">📊 ' + escapeHtml(p.statusKey) + ': ' + escapeHtml(p.statusText) + '</div>');
       break;
     case 'widget_update':
-      outputAppend('<div class="info">📦 widget ' + escapeHtml(p.widgetKey) + '</div>');
+      outputAppend('<div class="info">📦 ' + escapeHtml(p.widgetKey) + '</div>');
       break;
     case 'title_update':
-      outputAppend('<div class="info">📝 title: ' + escapeHtml(p.title) + '</div>');
+      outputAppend('<div class="info">📝 ' + escapeHtml(p.title) + '</div>');
       break;
     case 'editor_text_update':
       outputAppend('<div class="info">📄 editor_text_update</div>');
+      break;
+    case 'user_question':
+      outputAppend('<div class="ui-request" style="margin:4px 0">❓ [' + escapeHtml(p.method) + ']: ' + escapeHtml(p.title) + ' (id=' + p.id + ')</div>');
+      if (p.message) outputAppend('<div class="ui-request" style="margin:2px 0 4px 12px">' + escapeHtml(p.message) + '</div>');
       break;
     case 'extension_error':
       outputAppend('<div class="error">extension_error: ' + escapeHtml(p.error || '') + '</div>');
@@ -572,5 +807,6 @@ setInterval(checkConnection, 30000);
 // startup
 setTimeout(listSessions, 1000);
 </script>
+<script src="marked.min.js"></script>
 </body>
 </html>
