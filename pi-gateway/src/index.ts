@@ -15,6 +15,8 @@ import { registerSessionOpsRoutes } from "./routes/session-ops.js";
 import { registerLifecycleRoutes } from "./routes/lifecycle.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 
+const GATEWAY_PORT = parseInt(process.env.GATEWAY_PORT || process.env.PORT || "3000", 10);
+const CORS_ORIGINS = process.env.CORS_ORIGIN?.split(",") ?? ["http://localhost:5173"];
 const MAX_TOTAL_PROCESSES = parseInt(process.env.MAX_SESSIONS || "50", 10);
 
 function validateEnv() {
@@ -42,7 +44,7 @@ const app = Fastify({
 });
 
 await app.register(cors, {
-  origin: process.env.CORS_ORIGIN?.split(",") || ["http://localhost:5173"],
+  origin: CORS_ORIGINS,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
@@ -160,6 +162,5 @@ process.on("unhandledRejection", (reason) => {
 });
 
 // --- Start ---
-const port = parseInt(process.env.PORT || "3000", 10);
-await app.listen({ port, host: "0.0.0.0" });
-app.log.info(`pi HTTP Gateway listening on port ${port}`);
+await app.listen({ port: GATEWAY_PORT, host: "0.0.0.0" });
+app.log.info(`pi HTTP Gateway listening on port ${GATEWAY_PORT}`);
