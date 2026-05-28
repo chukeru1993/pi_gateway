@@ -14,6 +14,7 @@ import { registerModelConfigRoutes } from "./routes/model-config.js";
 import { registerSessionOpsRoutes } from "./routes/session-ops.js";
 import { registerLifecycleRoutes } from "./routes/lifecycle.js";
 import { registerAdminRoutes } from "./routes/admin.js";
+import { registerFileRoutes } from "./routes/files.js";
 
 const GATEWAY_PORT = parseInt(process.env.GATEWAY_PORT || process.env.PORT || "3000", 10);
 const CORS_ORIGINS = process.env.CORS_ORIGIN?.split(",") ?? ["http://localhost:5173", "null"];
@@ -100,6 +101,7 @@ registerUiResponseRoutes(app, pool);
 registerModelConfigRoutes(app, pool);
 registerSessionOpsRoutes(app, pool);
 registerLifecycleRoutes(app, pool);
+registerFileRoutes(app, pool);
 
 // Admin routes (dev convenience: no auth required)
 app.register(async (scope) => {
