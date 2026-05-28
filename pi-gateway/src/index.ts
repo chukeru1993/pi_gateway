@@ -16,7 +16,7 @@ import { registerLifecycleRoutes } from "./routes/lifecycle.js";
 import { registerAdminRoutes } from "./routes/admin.js";
 
 const GATEWAY_PORT = parseInt(process.env.GATEWAY_PORT || process.env.PORT || "3000", 10);
-const CORS_ORIGINS = process.env.CORS_ORIGIN?.split(",") ?? ["http://localhost:5173"];
+const CORS_ORIGINS = process.env.CORS_ORIGIN?.split(",") ?? ["http://localhost:5173", "null"];
 const MAX_TOTAL_PROCESSES = parseInt(process.env.MAX_SESSIONS || "50", 10);
 
 function validateEnv() {
@@ -45,10 +45,10 @@ const app = Fastify({
 
 const usesWildcard = CORS_ORIGINS.includes("*");
 await app.register(cors, {
-  origin: CORS_ORIGINS,
+  origin: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: !usesWildcard,
+  credentials: true,
 });
 
 await app.register(rateLimit, {

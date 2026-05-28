@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { execSync } from "node:child_process";
 import * as os from "node:os";
 import { PiProcess } from "./pi-process.js";
 import { collectEvent, type RecentEvent } from "./metrics.js";
@@ -6,8 +7,27 @@ import { collectEvent, type RecentEvent } from "./metrics.js";
 const MAX_TOTAL_PROCESSES = parseInt(process.env.MAX_SESSIONS || "50", 10);
 const MAX_MEMORY_PER_PROCESS = 2 * 1024 * 1024 * 1024; // 2GB
 const IDLE_TIMEOUT_MS = parseInt(process.env.IDLE_TIMEOUT_MINUTES || "30", 10) * 60_000;
-const SYSTEM_MEMORY_RATIO = parseFloat(process.env.SYSTEM_MEMORY_EVICTION_THRESHOLD || "0.98");
+const SYSTEM_MEMORY_RATIO = parseFloat(process.env.SYSTEM_MEMORY_EVICTION_THRESHOLD || "0.95");
 const SYSTEM_MEMORY_EVICTION_DISABLED = process.env.DISABLE_SYSTEM_MEMORY_EVICTION === "true";
+
+function isMemoryPressured(): boolean {
+  if (os.platform() === "darwin") {
+    try {
+      const out = execSync("memory_pressure", { encoding: "utf8", timeout: 5000 });
+      const match = out.match(/System-wide memory free percentage:\s*(\d+)/);
+      if (match) {
+        const freePct = parseInt(match[1]);
+        // macOS shows available (free + cache) percentage; evict when truly low
+        return freePct < 10;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+  const used = os.totalmem() - os.freemem();
+  return used / os.totalmem() > SYSTEM_MEMORY_RATIO;
+}
 
 export interface CreateOptions {
   provider?: string;
@@ -82,9 +102,7 @@ export class PiProcessPool {
   startSystemMemoryMonitor() {
     if (SYSTEM_MEMORY_EVICTION_DISABLED) return;
     setInterval(() => {
-      const totalMem = os.totalmem();
-      const usedMem = totalMem - os.freemem();
-      if (usedMem / totalMem <= SYSTEM_MEMORY_RATIO) return;
+      if (!isMemoryPressured()) return;
 
       let oldest: PiProcess | null = null;
       let oldestId: string | null = null;
@@ -96,7 +114,15 @@ export class PiProcessPool {
         }
       }
       if (oldestId) {
-        this.destroy(oldestId, "system memory > 80%", "ejected");
+        let freePct = Math.round((os.freemem() / os.totalmem()) * 100);
+        if (os.platform() === "darwin") {
+          try {
+            const out = execSync("memory_pressure", { encoding: "utf8", timeout: 5000 });
+            const m = out.match(/System-wide memory free percentage:\s*(\d+)/);
+            if (m) freePct = parseInt(m[1]);
+          } catch {}
+        }
+        this.destroy(oldestId, `system memory pressure (${freePct}% free)`, "ejected");
       }
     }, 30_000);
   }
