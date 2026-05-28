@@ -1,5 +1,4 @@
 import { spawn } from "node:child_process";
-import { execSync } from "node:child_process";
 import * as os from "node:os";
 import { PiProcess } from "./pi-process.js";
 import { collectEvent, type RecentEvent } from "./metrics.js";
@@ -7,26 +6,22 @@ import { collectEvent, type RecentEvent } from "./metrics.js";
 const MAX_TOTAL_PROCESSES = parseInt(process.env.MAX_SESSIONS || "50", 10);
 const MAX_MEMORY_PER_PROCESS = 2 * 1024 * 1024 * 1024; // 2GB
 const IDLE_TIMEOUT_MS = parseInt(process.env.IDLE_TIMEOUT_MINUTES || "30", 10) * 60_000;
-const SYSTEM_MEMORY_RATIO = parseFloat(process.env.SYSTEM_MEMORY_EVICTION_THRESHOLD || "0.95");
 const SYSTEM_MEMORY_EVICTION_DISABLED = process.env.DISABLE_SYSTEM_MEMORY_EVICTION === "true";
+// macOS os.freemem() excludes reclaimable cache, so it reports much lower free memory
+// than the actual available memory. Use a higher threshold to avoid false positives.
+const SYSTEM_MEMORY_RATIO = parseFloat(
+  process.env.SYSTEM_MEMORY_EVICTION_THRESHOLD
+    || (os.platform() === "darwin" ? "0.99" : "0.95"),
+);
 
-function isMemoryPressured(): boolean {
-  if (os.platform() === "darwin") {
-    try {
-      const out = execSync("memory_pressure", { encoding: "utf8", timeout: 5000 });
-      const match = out.match(/System-wide memory free percentage:\s*(\d+)/);
-      if (match) {
-        const freePct = parseInt(match[1]);
-        // macOS shows available (free + cache) percentage; evict when truly low
-        return freePct < 10;
-      }
-      return false;
-    } catch {
-      return false;
-    }
-  }
-  const used = os.totalmem() - os.freemem();
-  return used / os.totalmem() > SYSTEM_MEMORY_RATIO;
+function getSystemMemoryUsedRatio(): number {
+  const totalMem = os.totalmem();
+  const freeMem = os.freemem();
+  return (totalMem - freeMem) / totalMem;
+}
+
+function getSystemFreePercent(): number {
+  return Math.round((1 - getSystemMemoryUsedRatio()) * 100);
 }
 
 export interface CreateOptions {
@@ -102,7 +97,7 @@ export class PiProcessPool {
   startSystemMemoryMonitor() {
     if (SYSTEM_MEMORY_EVICTION_DISABLED) return;
     setInterval(() => {
-      if (!isMemoryPressured()) return;
+      if (getSystemMemoryUsedRatio() <= SYSTEM_MEMORY_RATIO) return;
 
       let oldest: PiProcess | null = null;
       let oldestId: string | null = null;
@@ -114,14 +109,7 @@ export class PiProcessPool {
         }
       }
       if (oldestId) {
-        let freePct = Math.round((os.freemem() / os.totalmem()) * 100);
-        if (os.platform() === "darwin") {
-          try {
-            const out = execSync("memory_pressure", { encoding: "utf8", timeout: 5000 });
-            const m = out.match(/System-wide memory free percentage:\s*(\d+)/);
-            if (m) freePct = parseInt(m[1]);
-          } catch {}
-        }
+        const freePct = getSystemFreePercent();
         this.destroy(oldestId, `system memory pressure (${freePct}% free)`, "ejected");
       }
     }, 30_000);
@@ -133,5 +121,13 @@ export class PiProcessPool {
 
   get size(): number {
     return this.processes.size;
+  }
+
+  async refreshAllMemory(): Promise<void> {
+    const promises: Promise<number>[] = [];
+    for (const [, pi] of this.processes) {
+      promises.push(pi.updateMemoryUsage());
+    }
+    await Promise.allSettled(promises);
   }
 }

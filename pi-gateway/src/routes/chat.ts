@@ -40,11 +40,35 @@ export function registerChatRoutes(app: FastifyInstance, pool: PiProcessPool) {
     const sse = createSSEWriter(reply.raw);
     pi.activeSSEs.add(sse);
 
-    let streamResolve: () => void;
+    let streamResolve: () => void = () => {};
     const streamDone = new Promise<void>((r) => { streamResolve = r; });
+
+    let cleaned = false;
+    const cleanup = () => {
+      if (cleaned) return;
+      cleaned = true;
+      clearTimeout(safetyTimer);
+      unsubscribe();
+      pi.activeSSEs.delete(sse);
+      sse.end();
+      pi.resetIdleTimer();
+      streamResolve();
+    };
+
+    const STREAM_TIMEOUT = 10 * 60 * 1000; // 10 minutes safety timeout
+    const safetyTimer = setTimeout(() => {
+      sse.write("error", { message: "Stream timed out" });
+      cleanup();
+    }, STREAM_TIMEOUT);
 
     const unsubscribe = pi.onEvent((event) => {
       pi.resetIdleTimer();
+
+      if (event.type === "error") {
+        sse.write("error", { message: event.message });
+        cleanup();
+        return;
+      }
 
       if (event.type === "extension_ui_request") {
         switch (event.method) {
@@ -107,8 +131,7 @@ export function registerChatRoutes(app: FastifyInstance, pool: PiProcessPool) {
 
       if (event.type === "agent_end") {
         sse.write("agent_end", event);
-        sse.end();
-        streamResolve();
+        cleanup();
         return;
       }
 
@@ -116,10 +139,7 @@ export function registerChatRoutes(app: FastifyInstance, pool: PiProcessPool) {
     });
 
     req.raw.on("close", () => {
-      unsubscribe();
-      pi.activeSSEs.delete(sse);
-      pi.resetIdleTimer();
-      streamResolve();
+      cleanup();
     });
 
     try {
@@ -129,10 +149,7 @@ export function registerChatRoutes(app: FastifyInstance, pool: PiProcessPool) {
     } catch (err: any) {
       pool.errorsCount++;
       sse.write("error", { message: err.message });
-      unsubscribe();
-      pi.activeSSEs.delete(sse);
-      sse.end();
-      streamResolve();
+      cleanup();
       return;
     }
 

@@ -1,6 +1,6 @@
-import { type ChildProcess, spawn, exec } from "node:child_process";
-import { promisify } from "node:util";
+import { type ChildProcess, spawn } from "node:child_process";
 import * as fs from "node:fs/promises";
+import * as os from "node:os";
 
 export interface PendingUIQuestion {
   id: string;
@@ -13,10 +13,9 @@ export interface PendingUIQuestion {
   timeout?: number;
 }
 
-const execAsync = promisify(exec);
-
 export class PiProcess {
   private proc: ChildProcess;
+  private procKilled = false;
   private requestId = 0;
   private pendingResponses = new Map<string, {
     resolve: (msg: any) => void;
@@ -29,6 +28,7 @@ export class PiProcess {
   private idleTimer?: ReturnType<typeof setTimeout>;
   private memoryTimer?: ReturnType<typeof setInterval>;
   private hangTimer?: ReturnType<typeof setTimeout>;
+  private hangTimerPaused = false;
   private readonly HANG_TIMEOUT = parseInt(process.env.HANG_TIMEOUT_MINUTES || "5", 10) * 60_000;
   public intentionalShutdown = false;
   private onIdleTimeout: (() => void) | undefined;
@@ -96,13 +96,16 @@ export class PiProcess {
         if (line.length > 0) {
           try {
             this.handleLine(JSON.parse(line));
-          } catch {}
+          } catch {
+            console.warn(`[PiProcess ${this.sessionId}] Failed to parse stdout line: ${line.slice(0, 200)}`);
+          }
         }
       }
     });
   }
 
   private resetHangTimer() {
+    if (this.hangTimerPaused) return;
     if (this.hangTimer) clearTimeout(this.hangTimer);
     this.hangTimer = setTimeout(() => {
       for (const listener of this.eventListeners) {
@@ -111,8 +114,22 @@ export class PiProcess {
           message: "Agent process appears hung (no output for 5 minutes)",
         });
       }
+      this.procKilled = true;
       this.proc.kill("SIGKILL");
     }, this.HANG_TIMEOUT);
+  }
+
+  private pauseHangTimer() {
+    this.hangTimerPaused = true;
+    if (this.hangTimer) {
+      clearTimeout(this.hangTimer);
+      this.hangTimer = undefined;
+    }
+  }
+
+  private resumeHangTimer() {
+    this.hangTimerPaused = false;
+    this.resetHangTimer();
   }
 
   private handleLine(msg: any) {
@@ -149,9 +166,11 @@ export class PiProcess {
     switch (msg.type) {
       case "agent_start":
         this.isStreaming = true;
+        this.resumeHangTimer();
         break;
       case "agent_end":
         this.isStreaming = false;
+        this.pauseHangTimer();
         break;
       case "compaction_start":
         this.isCompacting = true;
@@ -171,7 +190,7 @@ export class PiProcess {
   }
 
   async sendCommand(cmd: any, timeout = 30_000): Promise<any> {
-    this.resetHangTimer();
+    this.resumeHangTimer();
     const id = `req_${++this.requestId}`;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -197,15 +216,28 @@ export class PiProcess {
         this.draining = true;
         const drainHandler = () => {
           this.proc.stdin!.removeListener("drain", drainHandler);
-          this.draining = false;
-          for (const queued of this.writeQueue) {
-            this.proc.stdin!.write(queued);
-          }
-          this.writeQueue = [];
+          this.flushWriteQueue();
         };
         this.proc.stdin!.on("drain", drainHandler);
       }
     }
+  }
+
+  private flushWriteQueue() {
+    while (this.writeQueue.length > 0) {
+      const queued = this.writeQueue.shift()!;
+      const ok = this.proc.stdin!.write(queued);
+      if (!ok) {
+        this.draining = true;
+        const drainHandler = () => {
+          this.proc.stdin!.removeListener("drain", drainHandler);
+          this.flushWriteQueue();
+        };
+        this.proc.stdin!.on("drain", drainHandler);
+        return;
+      }
+    }
+    this.draining = false;
   }
 
   onEvent(listener: (event: any) => void): () => void {
@@ -224,13 +256,12 @@ export class PiProcess {
   resetIdleTimer() {
     if (!this.idleTimer) return;
     this.idleTimer.refresh();
-    this.resetHangTimer();
   }
 
   startMemoryMonitor(maxBytes: number) {
     this.memoryTimer = setInterval(async () => {
       try {
-        const mem = await this.getChildProcessMemory();
+        const mem = await this.updateMemoryUsage();
         if (mem > maxBytes) {
           for (const listener of this.eventListeners) {
             listener({
@@ -244,18 +275,25 @@ export class PiProcess {
     }, 10_000);
   }
 
-  async getChildProcessMemory(): Promise<number> {
+  private cachedMemoryBytes = 0;
+
+  getChildProcessMemory(): number {
+    return this.cachedMemoryBytes;
+  }
+
+  async updateMemoryUsage(): Promise<number> {
     if (!this.proc.pid) return 0;
-    try {
-      const statm = await fs.readFile(`/proc/${this.proc.pid}/statm`, "utf8");
-      const pages = parseInt(statm.split(" ")[1], 10);
-      if (!isNaN(pages)) return pages * 4096;
-    } catch {}
-    try {
-      const { stdout } = await execAsync(`ps -o rss= -p ${this.proc.pid}`, { encoding: "utf8" });
-      const kb = parseInt(stdout.trim(), 10);
-      if (!isNaN(kb)) return kb * 1024;
-    } catch {}
+    if (os.platform() === "linux") {
+      try {
+        const statm = await fs.readFile(`/proc/${this.proc.pid}/statm`, "utf8");
+        const pages = parseInt(statm.split(" ")[1], 10);
+        if (!isNaN(pages)) {
+          this.cachedMemoryBytes = pages * 4096;
+          return this.cachedMemoryBytes;
+        }
+      } catch {}
+    }
+    this.cachedMemoryBytes = 0;
     return 0;
   }
 
@@ -280,9 +318,14 @@ export class PiProcess {
     if (this.idleTimer) clearTimeout(this.idleTimer);
     if (this.memoryTimer) clearInterval(this.memoryTimer);
     if (this.hangTimer) clearTimeout(this.hangTimer);
-    this.proc.kill("SIGTERM");
-    setTimeout(() => {
-      if (!this.proc.killed) this.proc.kill("SIGKILL");
-    }, 1000);
+    if (!this.procKilled && this.proc.exitCode === null && !this.proc.signalCode) {
+      this.procKilled = true;
+      this.proc.kill("SIGTERM");
+      setTimeout(() => {
+        if (this.proc.exitCode === null && !this.proc.signalCode) {
+          this.proc.kill("SIGKILL");
+        }
+      }, 1000);
+    }
   }
 }

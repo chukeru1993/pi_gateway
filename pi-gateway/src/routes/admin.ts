@@ -28,6 +28,7 @@ export function registerAdminRoutes(app: FastifyInstance, pool: PiProcessPool, m
     });
 
     scope.get("/api/sessions", async (): Promise<{ sessions: SessionSnapshot[] }> => {
+      await pool.refreshAllMemory();
       const sessions: SessionSnapshot[] = [];
       for (const [id, pi] of pool.all()) {
         sessions.push({
@@ -45,7 +46,7 @@ export function registerAdminRoutes(app: FastifyInstance, pool: PiProcessPool, m
           autoRetryEnabled: pi.autoRetryEnabled,
           createdAt: pi.createdAt,
           lastActivityAt: pi.lastActivityAt,
-          memoryMB: Math.round((await pi.getChildProcessMemory()) / 1024 / 1024),
+          memoryMB: Math.round(pi.getChildProcessMemory() / 1024 / 1024),
           pendingUiQuestions: pi.getPendingUiRequests().length,
         });
       }
@@ -56,6 +57,7 @@ export function registerAdminRoutes(app: FastifyInstance, pool: PiProcessPool, m
       const { id } = req.params as { id: string };
       const pi = pool.get(id);
       if (!pi) return reply.code(404).send({ error: "Session not found" });
+      await pi.updateMemoryUsage();
       const snapshot: SessionSnapshot = {
         sessionId: id,
         status: pi.isStreaming ? "streaming" : pi.isCompacting ? "compacting" : "idle",
@@ -71,7 +73,7 @@ export function registerAdminRoutes(app: FastifyInstance, pool: PiProcessPool, m
         autoRetryEnabled: pi.autoRetryEnabled,
         createdAt: pi.createdAt,
         lastActivityAt: pi.lastActivityAt,
-        memoryMB: Math.round((await pi.getChildProcessMemory()) / 1024 / 1024),
+        memoryMB: Math.round(pi.getChildProcessMemory() / 1024 / 1024),
         pendingUiQuestions: pi.getPendingUiRequests().length,
       };
       return snapshot;

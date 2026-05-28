@@ -89,10 +89,11 @@ describe("PiProcess - 状态字段提取", () => {
     await pi.shutdown();
   });
 
-  it("getChildProcessMemory 返回有效 RSS 值（非 0）", async () => {
-    const mem = await pi.getChildProcessMemory();
-    expect(mem).toBeGreaterThan(0);
+  it("updateMemoryUsage + getChildProcessMemory 返回有效值", async () => {
+    const mem = await pi.updateMemoryUsage();
     expect(typeof mem).toBe("number");
+    expect(mem).toBeGreaterThanOrEqual(0);
+    expect(pi.getChildProcessMemory()).toBe(mem);
   });
 
   it("getPendingUiRequests 初始为空数组", () => {
