@@ -99,6 +99,31 @@ pre,code{font-family:"SF Mono","Fira Code","Cascadia Code",monospace}
     .output .ui-request{color:#d29922;background:#2a210f;padding:2px 6px;border-radius:3px}
     .output .info{color:#8b949e;font-size:10px}
     .output .divider{color:#30363d;margin:4px 0}
+  /* interactive widget */
+  .ui-widget{margin:10px 0;border:1px solid #3a2f1a;border-radius:10px;background:#1c180d;overflow:hidden;box-shadow:0 1px 4px #0003}
+  .ui-widget-header{font-size:11px;color:#d29922;padding:8px 12px;background:#241f10;border-bottom:1px solid #3a2f1a;display:flex;justify-content:space-between;align-items:center}
+  .ui-widget-body{padding:10px 14px}
+  .ui-widget-msg{font-size:12px;color:#c9d1d9;line-height:1.6;margin-bottom:10px;word-break:break-word}
+  .ui-widget-title{font-size:12px;font-weight:600;color:#e6edf3;margin-bottom:8px;word-break:break-word}
+  .ui-widget-options{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+  .ui-widget-btn{font-size:12px;padding:8px 14px;border-radius:6px;border:1px solid;cursor:pointer;font-family:inherit;transition:opacity .15s}
+  .ui-widget-btn:hover{opacity:.85}
+  .ui-widget-btn:disabled{opacity:.4;cursor:not-allowed}
+  .ui-widget-btn-option{background:#242015;color:#d29922;border-color:#3a2f1a;text-align:left}
+  .ui-widget-btn-option:hover{background:#2e281c;border-color:#5a452a}
+  .ui-widget-btn-option.selected{background:#1f6000;color:#c9d1d9;border-color:#238636}
+  .ui-widget-btn-confirm{background:#238636;color:#fff;border-color:#2ea043}
+  .ui-widget-btn-cancel{background:#21262d;color:#c9d1d9;border-color:#30363d}
+  .ui-widget-btn-cancel:hover{background:#30363d}
+  .ui-widget-input-row{display:flex;gap:8px;margin-bottom:6px}
+  .ui-widget-input-row input{margin:0;flex:1;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;padding:7px 10px;font-size:13px;font-family:inherit}
+  .ui-widget-input-row input:focus{outline:none;border-color:#58a6ff}
+  .ui-widget-input-row textarea{flex:1;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#c9d1d9;padding:8px 10px;font-size:12px;font-family:monospace;resize:vertical;min-height:80px;line-height:1.5}
+  .ui-widget-input-row textarea:focus{outline:none;border-color:#58a6ff}
+  .ui-widget-input-row button{white-space:nowrap}
+  .ui-widget-result{font-size:11px;color:#3fb950;padding:6px 10px;border-top:1px solid #3a2f1a;background:#033a1611}
+  .ui-widget-result.cancelled{color:#f85149;background:#3a031611}
+  .ui-widget-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
 /* shortcuts panel */
 .shortcuts{
   border-top:1px solid #21262d;background:#161b22;padding:6px 10px;
@@ -393,6 +418,223 @@ function toggleFold(parentId, bodyClass) {
   }
 }
 
+async function sendUIResponse(requestId, payload) {
+  if (!currentSessionId) return;
+  const body = { id: requestId, ...payload };
+  try {
+    const r = await fetch(baseUrl() + '/sessions/' + currentSessionId + '/ui-response', {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: r.statusText }));
+      alert('响应失败: ' + (err.error || err.message));
+      return false;
+    }
+    return true;
+  } catch(e) {
+    alert('Error: ' + e.message);
+    return false;
+  }
+}
+
+function buildUIWidget(q) {
+  const widget = document.createElement('div');
+  widget.className = 'ui-widget';
+  widget.dataset.requestId = q.id;
+
+  const header = document.createElement('div');
+  header.className = 'ui-widget-header';
+  header.innerHTML = '❓ ' + escapeHtml(q.method.toUpperCase()) + ': ' + escapeHtml(q.title || '');
+  widget.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'ui-widget-body';
+
+  if (q.message) {
+    const msg = document.createElement('div');
+    msg.className = 'ui-widget-msg';
+    msg.innerHTML = renderMarkdown(q.message);
+    body.appendChild(msg);
+  }
+
+  function disableAll() {
+    if (widget._submitted) return;
+    widget._submitted = true;
+    if (widget._keyHandler) document.removeEventListener('keydown', widget._keyHandler);
+    widget.querySelectorAll('.ui-widget-btn, button, input, textarea').forEach(el => el.disabled = true);
+  }
+
+  function showResult(text, cancelled) {
+    const result = document.createElement('div');
+    result.className = 'ui-widget-result' + (cancelled ? ' cancelled' : '');
+    result.textContent = text;
+    widget.appendChild(result);
+  }
+
+  switch(q.method) {
+    case 'confirm': {
+      const footer = document.createElement('div');
+      footer.className = 'ui-widget-footer';
+      const btnYes = document.createElement('button');
+      btnYes.className = 'ui-widget-btn ui-widget-btn-confirm';
+      btnYes.textContent = '确认';
+      const btnNo = document.createElement('button');
+      btnNo.className = 'ui-widget-btn ui-widget-btn-cancel';
+      btnNo.textContent = '取消';
+      const confirmHandler = async () => {
+        if (widget._submitted) return;
+        widget._submitted = true;
+        disableAll();
+        const ok = await sendUIResponse(q.id, { confirmed: true });
+        if (ok) showResult('已确认', false);
+        else showResult('提交失败', true);
+      };
+      const cancelHandler = async () => {
+        if (widget._submitted) return;
+        widget._submitted = true;
+        disableAll();
+        const ok = await sendUIResponse(q.id, { cancelled: true });
+        if (ok) showResult('已取消', true);
+        else showResult('提交失败', true);
+      };
+      btnYes.onclick = confirmHandler;
+      btnNo.onclick = cancelHandler;
+      widget._keyHandler = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); confirmHandler(); }
+        else if (e.key === 'Escape') { e.preventDefault(); cancelHandler(); }
+      };
+      document.addEventListener('keydown', widget._keyHandler);
+      footer.appendChild(btnYes);
+      footer.appendChild(btnNo);
+      body.appendChild(footer);
+      break;
+    }
+    case 'select': {
+      if (q.options && q.options.length > 0) {
+        const opts = document.createElement('div');
+        opts.className = 'ui-widget-options';
+        q.options.forEach((opt, i) => {
+          const btn = document.createElement('button');
+          btn.className = 'ui-widget-btn ui-widget-btn-option';
+          btn.textContent = (i + 1) + '. ' + opt;
+          btn.onclick = async () => {
+            if (widget._submitted) return;
+            widget._submitted = true;
+            disableAll();
+            btn.classList.add('selected');
+            const ok = await sendUIResponse(q.id, { value: opt });
+            if (ok) showResult('已选择: ' + opt, false);
+            else showResult('提交失败', true);
+          };
+          opts.appendChild(btn);
+        });
+        body.appendChild(opts);
+        const footer = document.createElement('div');
+        footer.className = 'ui-widget-footer';
+        const btnCancel = document.createElement('button');
+        btnCancel.className = 'ui-widget-btn ui-widget-btn-cancel';
+        btnCancel.textContent = '取消';
+        btnCancel.onclick = async () => {
+          if (widget._submitted) return;
+          widget._submitted = true;
+          disableAll();
+          const ok = await sendUIResponse(q.id, { cancelled: true });
+          if (ok) showResult('已取消', true);
+          else showResult('提交失败', true);
+        };
+        footer.appendChild(btnCancel);
+        body.appendChild(footer);
+        widget._keyHandler = (e) => {
+          if (e.key === 'Escape') { e.preventDefault(); btnCancel.click(); }
+        };
+        document.addEventListener('keydown', widget._keyHandler);
+      } else {
+        const info = document.createElement('div');
+        info.style.cssText = 'color:#8b949e;font-size:12px;padding:4px 0';
+        info.textContent = '(无可用选项)';
+        body.appendChild(info);
+      }
+      break;
+    }
+    case 'input': {
+      const row = document.createElement('div');
+      row.className = 'ui-widget-input-row';
+      const input = document.createElement('input');
+      input.placeholder = q.placeholder || '请输入...';
+      input.value = q.prefill || '';
+      const btn = document.createElement('button');
+      btn.className = 'ui-widget-btn ui-widget-btn-confirm';
+      btn.textContent = '提交';
+      btn.disabled = !input.value.trim();
+      input.oninput = () => { btn.disabled = !input.value.trim(); };
+      input.onkeydown = (e) => { if (e.key === 'Enter' && !btn.disabled) btn.click(); };
+      btn.onclick = async () => {
+        const val = input.value.trim();
+        if (!val) return;
+        disableAll();
+        const ok = await sendUIResponse(q.id, { value: val });
+        if (ok) showResult('已提交: ' + val, false);
+        else showResult('提交失败', true);
+      };
+      row.appendChild(input);
+      row.appendChild(btn);
+      body.appendChild(row);
+      break;
+    }
+    case 'editor': {
+      const title = document.createElement('div');
+      title.className = 'ui-widget-title';
+      if (q.title) title.textContent = q.title;
+      body.appendChild(title);
+      const row = document.createElement('div');
+      row.className = 'ui-widget-input-row';
+      const ta = document.createElement('textarea');
+      ta.value = q.prefill || '';
+      const submitEditor = async () => {
+        if (widget._submitted) return;
+        widget._submitted = true;
+        disableAll();
+        const ok = await sendUIResponse(q.id, { value: ta.value });
+        if (ok) showResult('已提交', false);
+        else showResult('提交失败', true);
+      };
+      const cancelEditor = async () => {
+        if (widget._submitted) return;
+        widget._submitted = true;
+        disableAll();
+        const ok = await sendUIResponse(q.id, { cancelled: true });
+        if (ok) showResult('已取消', true);
+        else showResult('提交失败', true);
+      };
+      widget._keyHandler = (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); cancelEditor(); }
+        else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submitEditor(); }
+      };
+      document.addEventListener('keydown', widget._keyHandler);
+      row.appendChild(ta);
+      body.appendChild(row);
+      const footer = document.createElement('div');
+      footer.className = 'ui-widget-footer';
+      const btnOk = document.createElement('button');
+      btnOk.className = 'ui-widget-btn ui-widget-btn-confirm';
+      btnOk.textContent = '确认';
+      btnOk.onclick = submitEditor;
+      const btnCancel = document.createElement('button');
+      btnCancel.className = 'ui-widget-btn ui-widget-btn-cancel';
+      btnCancel.textContent = '取消';
+      btnCancel.onclick = cancelEditor;
+      footer.appendChild(btnOk);
+      footer.appendChild(btnCancel);
+      body.appendChild(footer);
+      break;
+    }
+  }
+
+  widget.appendChild(body);
+  return widget;
+}
+
 // --- sessions ---
 async function createSession(){
   try {
@@ -543,7 +785,13 @@ function renderSSEEvent(type, p) {
       break;
     }
     case 'agent_end':
-      outputEndStream();
+      if (streamBlock && streamBlockType === 'text' && streamBuffer) {
+        streamBlock.className += ' md-content';
+        streamBlock.innerHTML = renderMarkdown(streamBuffer);
+      }
+      streamBlock = null;
+      streamBuffer = '';
+      streamBlockType = '';
       if (p.messages) {
         const last = p.messages[p.messages.length - 1];
         if (last?.usage) {
@@ -596,7 +844,18 @@ function renderSSEEvent(type, p) {
           outputAppendStream(sub.delta || '');
           break;
         case 'text_end':
-          outputEndStream();
+          if (streamBlock) {
+            const text = sub.content || sub.text || streamBuffer;
+            if (text && (streamBlockType === 'text' || streamBlock.className === 'text')) {
+              streamBlock.className += ' md-content';
+              streamBlock.innerHTML = renderMarkdown(text);
+            } else if (text) {
+              streamBlock.textContent = text;
+            }
+          }
+          streamBlock = null;
+          streamBuffer = '';
+          streamBlockType = '';
           break;
         case 'toolcall_start': {
           const contentBlock = sub.partial?.content?.[sub.contentIndex];
@@ -648,7 +907,16 @@ function renderSSEEvent(type, p) {
           break;
         }
         case 'done':
-          outputEndStream();
+          if (streamBlock && streamBlockType === 'text') {
+            const doneText = (sub.message?.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n');
+            if (doneText) {
+              streamBlock.className += ' md-content';
+              streamBlock.innerHTML = renderMarkdown(doneText);
+            }
+          }
+          streamBlock = null;
+          streamBuffer = '';
+          streamBlockType = '';
           outputAppend('<div class="info" style="margin:6px 0">✅ done (' + (sub.reason || '') + ')</div>');
           break;
         default:
@@ -686,7 +954,6 @@ function renderSSEEvent(type, p) {
         const body = block.querySelector('.toolexec-body');
         if (body) {
           const text = extractToolResult(p.result);
-          body.classList.add('expanded');
           let mdContainer = body.querySelector('.md-content');
           if (!mdContainer) {
             mdContainer = document.createElement('div');
@@ -734,8 +1001,12 @@ function renderSSEEvent(type, p) {
       outputAppend('<div class="info">📄 editor_text_update</div>');
       break;
     case 'user_question':
-      outputAppend('<div class="ui-request" style="margin:4px 0">❓ [' + escapeHtml(p.method) + ']: ' + escapeHtml(p.title) + ' (id=' + p.id + ')</div>');
-      if (p.message) outputAppend('<div class="ui-request" style="margin:2px 0 4px 12px">' + escapeHtml(p.message) + '</div>');
+      if (currentMsgContent) {
+        currentMsgContent.appendChild(buildUIWidget(p));
+      } else {
+        $('#output').appendChild(buildUIWidget(p));
+      }
+      $('#output').scrollTop = $('#output').scrollHeight;
       break;
     case 'extension_error':
       outputAppend('<div class="error">extension_error: ' + escapeHtml(p.error || '') + '</div>');
