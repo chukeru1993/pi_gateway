@@ -220,6 +220,8 @@ pre,code{font-family:"SF Mono","Fira Code","Cascadia Code",monospace}
   /* usage info */
   .msg-meta{font-size:10px;color:#484f58;text-align:right;margin-top:4px}
   </style>
+<script src="marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
 </head>
 <body>
 
@@ -286,6 +288,7 @@ const $$ = (s) => document.querySelectorAll(s);
 let currentSessionId = null;
 let abortController = null;
 let currentMsgContent = null;
+const activeWidgets = new Set();
 
 // --- persistence ---
 function savePrefs() {
@@ -350,17 +353,14 @@ function outputAppendStream(text) {
   }
   $('#output').scrollTop = $('#output').scrollHeight;
 }
-function outputEndStream() {
-  if (streamBlock && (streamBlockType === 'text' || streamBlock?.className === 'text') && streamBuffer) {
-    streamBlock.className += ' md-content';
-    streamBlock.innerHTML = renderMarkdown(streamBuffer);
-  }
-  streamBlock = null;
-  streamBuffer = '';
-  streamBlockType = '';
-  $('#output').scrollTop = $('#output').scrollHeight;
-}
 function outputClear() { $('#output').innerHTML = ''; streamBlock = null; streamBuffer = ''; streamBlockType = ''; currentMsgContent = null; Object.keys(toolcallBlocks).forEach(k => delete toolcallBlocks[k]); }
+const MAX_OUTPUT_NODES = 200;
+function trimOutput() {
+  const output = $('#output');
+  while (output.children.length > MAX_OUTPUT_NODES) {
+    output.removeChild(output.firstChild);
+  }
+}
 
 // --- response overlay ---
 function showResponse(title, text) {
@@ -370,13 +370,19 @@ function showResponse(title, text) {
 }
 function closeResponse() { $('#response-overlay').classList.remove('show'); }
 
-function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
+function sanitizeHtml(html) {
+  if (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) {
+    return DOMPurify.sanitize(html, { ADD_ATTR: ['target'] });
+  }
+  return html;
+}
 function renderMarkdown(text) {
   if (!text) return escapeHtml(text || '');
   try {
     if (typeof marked !== 'undefined' && marked.parse) {
-      return marked.parse(text);
+      return sanitizeHtml(marked.parse(text));
     }
   } catch(e) {}
   return escapeHtml(text).replace(/\n/g, '<br>');
@@ -419,7 +425,7 @@ function toggleFold(parentId, bodyClass) {
 }
 
 async function sendUIResponse(requestId, payload) {
-  if (!currentSessionId) return;
+  if (!currentSessionId) return { ok: false, error: '无会话' };
   const body = { id: requestId, ...payload };
   try {
     const r = await fetch(baseUrl() + '/sessions/' + currentSessionId + '/ui-response', {
@@ -428,13 +434,11 @@ async function sendUIResponse(requestId, payload) {
     });
     if (!r.ok) {
       const err = await r.json().catch(() => ({ error: r.statusText }));
-      alert('响应失败: ' + (err.error || err.message));
-      return false;
+      return { ok: false, error: err.error || err.message || r.statusText };
     }
-    return true;
+    return { ok: true };
   } catch(e) {
-    alert('Error: ' + e.message);
-    return false;
+    return { ok: false, error: e.message };
   }
 }
 
@@ -461,7 +465,11 @@ function buildUIWidget(q) {
   function disableAll() {
     if (widget._submitted) return;
     widget._submitted = true;
-    if (widget._keyHandler) document.removeEventListener('keydown', widget._keyHandler);
+    if (widget._keyHandler) {
+      document.removeEventListener('keydown', widget._keyHandler);
+      widget._keyHandler = null;
+    }
+    activeWidgets.delete(widget);
     widget.querySelectorAll('.ui-widget-btn, button, input, textarea').forEach(el => el.disabled = true);
   }
 
@@ -486,17 +494,17 @@ function buildUIWidget(q) {
         if (widget._submitted) return;
         widget._submitted = true;
         disableAll();
-        const ok = await sendUIResponse(q.id, { confirmed: true });
-        if (ok) showResult('已确认', false);
-        else showResult('提交失败', true);
+        const res = await sendUIResponse(q.id, { confirmed: true });
+        if (res.ok) showResult('已确认', false);
+        else showResult('失败: ' + res.error, true);
       };
       const cancelHandler = async () => {
         if (widget._submitted) return;
         widget._submitted = true;
         disableAll();
-        const ok = await sendUIResponse(q.id, { cancelled: true });
-        if (ok) showResult('已取消', true);
-        else showResult('提交失败', true);
+        const res = await sendUIResponse(q.id, { cancelled: true });
+        if (res.ok) showResult('已取消', true);
+        else showResult('失败: ' + res.error, true);
       };
       btnYes.onclick = confirmHandler;
       btnNo.onclick = cancelHandler;
@@ -523,9 +531,9 @@ function buildUIWidget(q) {
             widget._submitted = true;
             disableAll();
             btn.classList.add('selected');
-            const ok = await sendUIResponse(q.id, { value: opt });
-            if (ok) showResult('已选择: ' + opt, false);
-            else showResult('提交失败', true);
+            const res = await sendUIResponse(q.id, { value: opt });
+            if (res.ok) showResult('已选择: ' + opt, false);
+            else showResult('失败: ' + res.error, true);
           };
           opts.appendChild(btn);
         });
@@ -539,9 +547,9 @@ function buildUIWidget(q) {
           if (widget._submitted) return;
           widget._submitted = true;
           disableAll();
-          const ok = await sendUIResponse(q.id, { cancelled: true });
-          if (ok) showResult('已取消', true);
-          else showResult('提交失败', true);
+          const res = await sendUIResponse(q.id, { cancelled: true });
+          if (res.ok) showResult('已取消', true);
+          else showResult('失败: ' + res.error, true);
         };
         footer.appendChild(btnCancel);
         body.appendChild(footer);
@@ -573,9 +581,9 @@ function buildUIWidget(q) {
         const val = input.value.trim();
         if (!val) return;
         disableAll();
-        const ok = await sendUIResponse(q.id, { value: val });
-        if (ok) showResult('已提交: ' + val, false);
-        else showResult('提交失败', true);
+        const res = await sendUIResponse(q.id, { value: val });
+        if (res.ok) showResult('已提交: ' + val, false);
+        else showResult('失败: ' + res.error, true);
       };
       row.appendChild(input);
       row.appendChild(btn);
@@ -595,17 +603,17 @@ function buildUIWidget(q) {
         if (widget._submitted) return;
         widget._submitted = true;
         disableAll();
-        const ok = await sendUIResponse(q.id, { value: ta.value });
-        if (ok) showResult('已提交', false);
-        else showResult('提交失败', true);
+        const res = await sendUIResponse(q.id, { value: ta.value });
+        if (res.ok) showResult('已提交', false);
+        else showResult('失败: ' + res.error, true);
       };
       const cancelEditor = async () => {
         if (widget._submitted) return;
         widget._submitted = true;
         disableAll();
-        const ok = await sendUIResponse(q.id, { cancelled: true });
-        if (ok) showResult('已取消', true);
-        else showResult('提交失败', true);
+        const res = await sendUIResponse(q.id, { cancelled: true });
+        if (res.ok) showResult('已取消', true);
+        else showResult('失败: ' + res.error, true);
       };
       widget._keyHandler = (e) => {
         if (e.key === 'Escape') { e.preventDefault(); cancelEditor(); }
@@ -632,6 +640,7 @@ function buildUIWidget(q) {
   }
 
   widget.appendChild(body);
+  activeWidgets.add(widget);
   return widget;
 }
 
@@ -743,12 +752,13 @@ async function sendChat(){
         if (frame.startsWith(':')) { outputAppend('<div class="info">♥ heartbeat</div>'); continue; }
 
         const em = frame.match(/^event: (.+)/m);
-        const dm = frame.match(/^data: (.+)/m);
-        if (!em || !dm) continue;
+        const dataLines = frame.split('\n').filter(l => l.startsWith('data: ')).map(l => l.slice(6));
+        if (!em || dataLines.length === 0) continue;
 
         const type = em[1];
+        const dataStr = dataLines.join('\n');
         let payload;
-        try { payload = JSON.parse(dm[1]); } catch(e) { continue; }
+        try { payload = JSON.parse(dataStr); } catch(e) { console.warn('[SSE] JSON parse failed:', dataStr.slice(0, 200)); continue; }
 
         renderSSEEvent(type, payload);
       }
@@ -756,6 +766,22 @@ async function sendChat(){
   } catch(e) {
     if (e.name !== 'AbortError') outputAppend('<div class="error">' + escapeHtml(e.message) + '</div>');
   } finally {
+    // Clean up any remaining stream state
+    streamBlock = null;
+    streamBuffer = '';
+    streamBlockType = '';
+    // Clean up stale toolcallBlocks
+    Object.keys(toolcallBlocks).forEach(k => delete toolcallBlocks[k]);
+    // Clean up any active widget keydown listeners
+    for (const w of activeWidgets) {
+      if (w._keyHandler) {
+        document.removeEventListener('keydown', w._keyHandler);
+        w._keyHandler = null;
+      }
+    }
+    activeWidgets.clear();
+    // Trim DOM if too large
+    trimOutput();
     btn.style.display = '';
     abortBtn.style.display = 'none';
     $('#chat-input').disabled = false;
@@ -1078,6 +1104,5 @@ setInterval(checkConnection, 30000);
 // startup
 setTimeout(listSessions, 1000);
 </script>
-<script src="marked.min.js"></script>
 </body>
 </html>
