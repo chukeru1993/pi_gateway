@@ -79,6 +79,7 @@ app.get("/health", async () => {
 app.addHook("preHandler", async (req, reply) => {
   if ((req.routeOptions.url || req.url) === "/health") return;
   if ((req.url || "").startsWith("/admin")) return;
+  if ((req.url || "").includes("/files/")) return; // 文件下载跳过认证
   try {
     await authHook(req as any);
   } catch (e: any) {

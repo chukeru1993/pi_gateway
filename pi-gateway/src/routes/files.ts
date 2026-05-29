@@ -29,10 +29,15 @@ const MIME_TYPES: Record<string, string> = {
 
 function isPathAllowed(filePath: string): boolean {
   const abs = path.resolve(filePath);
-  return ALLOWED_CWD_PREFIXES.some((p) => {
+  // 允许 CWD 白名单路径
+  const inCwd = ALLOWED_CWD_PREFIXES.some((p) => {
     const resolved = path.resolve(p);
     return abs === resolved || abs.startsWith(resolved + "/");
   });
+  if (inCwd) return true;
+  // 允许 gateway 工作目录下的 out/ 目录（Agent 生成文件的默认位置）
+  const gatewayOut = path.resolve(process.cwd(), "out");
+  return abs.startsWith(gatewayOut + "/");
 }
 
 export function registerFileRoutes(app: FastifyInstance, _pool: PiProcessPool) {
@@ -45,10 +50,20 @@ export function registerFileRoutes(app: FastifyInstance, _pool: PiProcessPool) {
     }
 
     // 解析绝对路径
-    const absPath = path.resolve("/", filePath);
+    let absPath = path.resolve("/", filePath);
 
-    // 安全校验：必须在 CWD 白名单内
+    // 如果路径不在白名单内，尝试在 gateway out/ 目录查找
     if (!isPathAllowed(absPath)) {
+      const gatewayOutPath = path.resolve(process.cwd(), "out", path.basename(filePath));
+      if (isPathAllowed(gatewayOutPath)) {
+        absPath = gatewayOutPath;
+      }
+    }
+
+    req.log.info({ sessionId, filePath, absPath }, "File download request");
+
+    if (!isPathAllowed(absPath)) {
+      req.log.warn({ absPath }, "File path not allowed");
       return reply.code(403).send({ error: "Path not allowed" });
     }
 
@@ -67,6 +82,8 @@ export function registerFileRoutes(app: FastifyInstance, _pool: PiProcessPool) {
       const contentType = MIME_TYPES[ext] || "application/octet-stream";
       const fileName = path.basename(absPath);
 
+      req.log.info({ absPath, size: stat.size, ext, contentType }, "Serving file");
+
       const content = await fs.readFile(absPath);
 
       reply
@@ -79,6 +96,7 @@ export function registerFileRoutes(app: FastifyInstance, _pool: PiProcessPool) {
       if (e.code === "ENOENT") {
         return reply.code(404).send({ error: "File not found" });
       }
+      req.log.error({ err: e }, "Failed to read file");
       return reply.code(500).send({ error: "Failed to read file" });
     }
   });

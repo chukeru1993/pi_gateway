@@ -28,13 +28,19 @@ export default function deliverFile(pi: ExtensionAPI) {
 			const filePath = path.resolve(params.filePath);
 			const fileName = params.fileName || path.basename(filePath);
 
-			// 验证文件存在
+			// 验证文件存在且大小 > 0
 			try {
 				const stat = await fs.stat(filePath);
 				if (!stat.isFile()) {
 					return {
 						content: [{ type: "text", text: `Error: ${filePath} is not a file` }],
 						details: { error: "not_a_file" },
+					};
+				}
+				if (stat.size === 0) {
+					return {
+						content: [{ type: "text", text: `Error: ${filePath} is empty (0 bytes)` }],
+						details: { error: "empty_file" },
 					};
 				}
 			} catch {
@@ -44,17 +50,30 @@ export default function deliverFile(pi: ExtensionAPI) {
 				};
 			}
 
-			// 构造下载链接（相对路径，前端拼接网关地址）
-			// 链接格式：[下载 fileName](filePath)
-			// 前端 Markdown 渲染器会检测此模式并转为 FileDownloadCard
+			// 读取文件内容用于内联返回（确保文件可读且完整）
+			let fileContent: string;
+			try {
+				fileContent = await fs.readFile(filePath, "utf-8");
+			} catch {
+				return {
+					content: [{ type: "text", text: `Error: Cannot read file: ${filePath}` }],
+					details: { error: "read_error" },
+				};
+			}
+
+			// 返回文件内容内联到对话中，前端可直接展示
+			// 同时附带 filePath 供 FileDownloadCard 下载
 			const desc = params.description ? `\n${params.description}` : "";
-			const text = `文件已生成：${fileName}${desc}\n\n[下载 ${fileName}](${filePath})`;
+			const ext = path.extname(fileName).toLowerCase();
+			const lang = ext === ".sql" ? "sql" : ext === ".md" ? "markdown" : "";
+			const text = `文件已生成：${fileName}${desc}\n\n\`\`\`${lang}\n${fileContent}\n\`\`\``;
 
 			return {
 				content: [{ type: "text", text }],
 				details: {
 					filePath,
 					fileName,
+					fileSize: fileContent.length,
 					description: params.description,
 				},
 			};

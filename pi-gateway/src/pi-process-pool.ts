@@ -6,7 +6,7 @@ import { collectEvent, type RecentEvent } from "./metrics.js";
 const MAX_TOTAL_PROCESSES = parseInt(process.env.MAX_SESSIONS || "50", 10);
 const MAX_MEMORY_PER_PROCESS = 2 * 1024 * 1024 * 1024; // 2GB
 const IDLE_TIMEOUT_MS = parseInt(process.env.IDLE_TIMEOUT_MINUTES || "30", 10) * 60_000;
-const SYSTEM_MEMORY_EVICTION_DISABLED = process.env.DISABLE_SYSTEM_MEMORY_EVICTION === "true";
+const SYSTEM_MEMORY_EVICTION_DISABLED = process.env.DISABLE_SYSTEM_MEMORY_EVICTION !== "false"; // 默认禁用
 // macOS os.freemem() excludes reclaimable cache, so it reports much lower free memory
 // than the actual available memory. Use a higher threshold to avoid false positives.
 const SYSTEM_MEMORY_RATIO = parseFloat(
